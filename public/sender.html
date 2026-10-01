@@ -499,8 +499,8 @@
 
     // ── Constants ────────────────────────────────────────────────────────────
     const CHUNK_SIZE        = 64 * 1024;
-    const BP_HIGH           = 16 * 1024 * 1024;
-    const BP_LOW            = 2  * 1024 * 1024;
+    const BP_HIGH           = 1024 * 1024; // 1 MB backpressure high-water mark
+    const BP_LOW            = 256  * 1024; // 256 KB backpressure low-water mark
     const ACOUSTIC_TIMEOUT  = 5000;
     const PROTOCOL_US_FAST  = 9;
 
@@ -510,6 +510,7 @@
     let ws=null, pc=null, dataChannel=null;
     let acousticTimer=null, countdownTimer=null;
     let sentBytes=0;
+    let transferCompleted=false, transferAckResolve=null;
     const speedCalc = new SpeedCalculator();
 
     // ── File Selection ───────────────────────────────────────────────────────
@@ -673,7 +674,12 @@
         const msg = JSON.parse(e.data);
         if      (msg.type==="room-joined") await startWebRTCSender(roomId);
         else if (msg.type==="signal")      await handleSignal(msg.data, roomId);
-        else if (msg.type==="peer-left")   { showError("Receiver disconnected."); teardown(); }
+        else if (msg.type==="peer-left")   {
+          if (!transferCompleted) {
+            showError("Receiver disconnected.");
+            teardown();
+          }
+        }
         else if (msg.type==="error")       showError("Server: " + msg.message);
       };
       ws.onerror = () => showError("WebSocket failed. Is the server running?");
@@ -722,6 +728,19 @@
           `${formatBytes(selectedFile.size)} · ${selectedFile.type || "unknown"}`;
         beginTransfer();
       };
+      dataChannel.onmessage = ({ data }) => {
+        try {
+          const msg = typeof data === "string" ? JSON.parse(data) : null;
+          if (msg?.type === "transfer-complete") {
+            if (transferAckResolve) {
+              transferAckResolve();
+              transferAckResolve = null;
+            }
+          }
+        } catch (err) {
+          console.warn("[Sender] onmessage error:", err);
+        }
+      };
       dataChannel.onerror = e => showError("DataChannel error: " + e);
 
       const offer = await pc.createOffer();
@@ -755,6 +774,7 @@
     async function beginTransfer() {
       const file = selectedFile;
       sentBytes = 0;
+      transferCompleted = false;
 
       // Fix: Android Chrome sometimes gives file.name as a full temp path
       // e.g. "17908486080...693.jpg" — extract only the basename
@@ -774,7 +794,12 @@
       });
 
       const waitDrain = () => new Promise(res => {
-        dataChannel.onbufferedamountlow = () => { dataChannel.onbufferedamountlow = null; res(); };
+        if (!dataChannel || dataChannel.bufferedAmount <= BP_LOW) return res();
+        const onLow = () => {
+          dataChannel.removeEventListener("bufferedamountlow", onLow);
+          res();
+        };
+        dataChannel.addEventListener("bufferedamountlow", onLow);
       });
 
       let offset = 0;
@@ -787,35 +812,51 @@
         sentBytes += buf.byteLength;
         speedCalc.record(buf.byteLength);
         const pct = sentBytes / file.size * 100;
-        document.getElementById("progress-bar").style.width  = Math.min(100, pct) + "%";
+        document.getElementById("progress-bar").style.width  = Math.min(99.9, pct) + "%";
         document.getElementById("progress-label").textContent = pct.toFixed(1) + "%";
         document.getElementById("speed-label").textContent    = speedCalc.getFormatted();
         document.getElementById("sent-label").textContent     = `${formatBytes(sentBytes)} / ${formatBytes(file.size)}`;
         if ((offset / CHUNK_SIZE) % 8 === 0) await new Promise(r => setTimeout(r, 0));
       }
 
-      // All chunks enqueued. Wait for the DataChannel send buffer to fully drain
-      // before closing — otherwise the OS may drop buffered-but-unsent bytes when
-      // the peer connection is torn down, causing the receiver to stall at ~90%.
+      // Wait for the DataChannel send buffer to fully drain to network layer
       await new Promise(res => {
         const check = () => {
-          if (dataChannel.bufferedAmount === 0) return res();
+          if (!dataChannel || dataChannel.bufferedAmount === 0) return res();
           setTimeout(check, 50);
         };
         check();
       });
 
-      // Give the receiver a moment to process the last chunk, then close
+      // Indicate to sender that data is flushed and awaiting receiver confirmation
+      document.getElementById("speed-label").textContent = "Finalizing…";
+
+      // Await confirmation ACK from receiver with a 45s fallback timeout
+      await new Promise(res => {
+        transferAckResolve = res;
+        setTimeout(() => {
+          console.warn("[Sender] Receiver ACK wait timed out after 45s, completing");
+          res();
+        }, 45000);
+      });
+
+      transferCompleted = true;
+      document.getElementById("progress-bar").style.width = "100%";
+      document.getElementById("progress-label").textContent = "100%";
       document.getElementById("progress-bar").classList.add("done");
       document.getElementById("done-meta").textContent = `${safeName} · ${formatBytes(file.size)} sent`;
       showPhase("done");
-
-      // Delay teardown so in-flight data finishes arriving at the receiver
-      setTimeout(() => { ws?.close(); pc?.close(); }, 2000);
     }
 
-
-    function teardown() { stopMic(); ws?.close(); pc?.close(); ws=null; pc=null; dataChannel=null; }
+    function teardown() {
+      stopMic();
+      try { dataChannel?.close(); } catch{}
+      try { ws?.close(); } catch{}
+      try { pc?.close(); } catch{}
+      ws = null; pc = null; dataChannel = null;
+      transferCompleted = false;
+      transferAckResolve = null;
+    }
 
     // ── Events ───────────────────────────────────────────────────────────────
     document.getElementById("btn-send").addEventListener("click", async () => {
@@ -824,7 +865,7 @@
       await startListening();
     });
     document.getElementById("btn-cancel-listen").addEventListener("click", () => { teardown(); showPhase("select"); });
-    document.getElementById("btn-send-again").addEventListener("click", () => { clearFile(); showPhase("select"); });
+    document.getElementById("btn-send-again").addEventListener("click", () => { teardown(); clearFile(); showPhase("select"); });
   </script>
 </body>
 </html>

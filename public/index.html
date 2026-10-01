@@ -475,7 +475,7 @@
 
     // ── State ────────────────────────────────────────────────────────────────
     let audioCtx=null, gainNode=null, beaconSource=null, beaconTimer=null;
-    let ggwaveInstance=null, ws=null, pc=null, roomId=null;
+    let ggwaveInstance=null, ws=null, pc=null, dataChannel=null, roomId=null;
     let fileChunks=[], fileMeta=null, receivedBytes=0;
     let pendingCandidates = [];   // buffer candidates before remoteDescription
     const speedCalc = new SpeedCalculator();
@@ -626,7 +626,11 @@
             await handleSignal(msg.data);
             break;
           case "peer-left":
-            showError("Sender disconnected."); teardown(); break;
+            if (!fileMeta || receivedBytes < fileMeta.size) {
+              showError("Sender disconnected.");
+              teardown();
+            }
+            break;
           case "error":
             showError("Server: " + msg.message); break;
         }
@@ -673,15 +677,20 @@
 
     // ── DataChannel ──────────────────────────────────────────────────────────
     function setupDataChannel(ch) {
+      dataChannel = ch;
       ch.binaryType = "arraybuffer";
       ch.onopen = () => showPhase("transfer");
       ch.onmessage = ({ data }) => {
         if (typeof data === "string") {
-          fileMeta = JSON.parse(data);
-          document.getElementById("file-name-display").textContent = fileMeta.name;
-          document.getElementById("file-meta-display").textContent =
-            `${formatBytes(fileMeta.size)} · ${fileMeta.mimeType || "unknown"}`;
-          receivedBytes = 0; fileChunks = [];
+          try {
+            fileMeta = JSON.parse(data);
+            document.getElementById("file-name-display").textContent = fileMeta.name;
+            document.getElementById("file-meta-display").textContent =
+              `${formatBytes(fileMeta.size)} · ${fileMeta.mimeType || "unknown"}`;
+            receivedBytes = 0; fileChunks = [];
+          } catch(err) {
+            console.warn("[Receiver] Error parsing meta:", err);
+          }
         } else {
           fileChunks.push(data);
           receivedBytes += data.byteLength;
@@ -698,6 +707,15 @@
     }
 
     function finishTransfer() {
+      // Send completion ACK to the sender over dataChannel
+      if (dataChannel && dataChannel.readyState === "open") {
+        try {
+          dataChannel.send(JSON.stringify({ type: "transfer-complete" }));
+        } catch (e) {
+          console.warn("[Receiver] Failed to send completion ACK:", e);
+        }
+      }
+
       document.getElementById("progress-bar").classList.add("done");
       const blob = new Blob(fileChunks, { type: fileMeta?.mimeType || "application/octet-stream" });
       const url  = URL.createObjectURL(blob);
@@ -707,11 +725,14 @@
       document.getElementById("done-meta").textContent =
         `${fileMeta?.name} · ${formatBytes(fileMeta?.size ?? 0)} received`;
       showPhase("done");
-      ws?.close(); pc?.close();
     }
 
     function teardown() {
-      stopBeacon(); ws?.close(); pc?.close(); pc = null; ws = null; pendingCandidates = [];
+      stopBeacon();
+      try { dataChannel?.close(); } catch {}
+      try { ws?.close(); } catch {}
+      try { pc?.close(); } catch {}
+      pc = null; ws = null; dataChannel = null; pendingCandidates = [];
     }
 
     // ── Events ───────────────────────────────────────────────────────────────
@@ -726,6 +747,7 @@
     });
     document.getElementById("btn-cancel").addEventListener("click", () => { teardown(); showPhase("start"); });
     document.getElementById("btn-receive-again").addEventListener("click", () => {
+      teardown();
       fileChunks = []; fileMeta = null; receivedBytes = 0; showPhase("start");
     });
   </script>
