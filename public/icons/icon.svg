@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14143a"/>
+      <stop offset="100%" stop-color="#07071a"/>
+    </linearGradient>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background Card -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect width="508" height="508" x="2" y="2" rx="110" fill="none" stroke="rgba(139,92,246,0.3)" stroke-width="4"/>
+
+  <!-- Glowing Sound Rings -->
+  <g filter="url(#glow)">
+    <!-- Outer wave -->
+    <path d="M 330 180 A 110 110 0 0 1 330 332" fill="none" stroke="url(#brandGrad)" stroke-width="24" stroke-linecap="round"/>
+    <path d="M 380 135 A 175 175 0 0 1 380 377" fill="none" stroke="url(#brandGrad)" stroke-width="24" stroke-linecap="round" opacity="0.75"/>
+    <path d="M 430 90 A 240 240 0 0 1 430 422" fill="none" stroke="url(#brandGrad)" stroke-width="24" stroke-linecap="round" opacity="0.45"/>
+
+    <!-- Left wave -->
+    <path d="M 182 180 A 110 110 0 0 0 182 332" fill="none" stroke="url(#brandGrad)" stroke-width="24" stroke-linecap="round"/>
+    <path d="M 132 135 A 175 175 0 0 0 132 377" fill="none" stroke="url(#brandGrad)" stroke-width="24" stroke-linecap="round" opacity="0.75"/>
+    <path d="M 82 90 A 240 240 0 0 0 82 422" fill="none" stroke="url(#brandGrad)" stroke-width="24" stroke-linecap="round" opacity="0.45"/>
+
+    <!-- Center Pulse Core -->
+    <circle cx="256" cy="256" r="44" fill="url(#brandGrad)"/>
+    <circle cx="256" cy="256" r="20" fill="#ffffff"/>
+  </g>
+</svg>

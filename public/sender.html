@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SonicDrop — Send</title>
 
+  <!-- PWA & Mobile Meta -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#07071a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1117,6 +1125,48 @@
       urlDetector.style.display = "none";
       showPhase("select");
     });
+
+    // ── Service Worker & Web Share Target Pickup ─────────────────────────────
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(e => console.warn("[PWA] SW register error:", e));
+      });
+    }
+
+    function checkIncomingShare() {
+      try {
+        const req = indexedDB.open("sonicdrop_share_db", 1);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains("shared_store")) {
+            req.result.createObjectStore("shared_store", { keyPath: "id" });
+          }
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction("shared_store", "readwrite");
+          const store = tx.objectStore("shared_store");
+          const getReq = store.get("latest_share");
+          getReq.onsuccess = () => {
+            const data = getReq.result;
+            if (data && (Date.now() - data.timestamp < 300000)) {
+              store.delete("latest_share");
+              if (data.files && data.files.length > 0) {
+                tabBtnFile.click();
+                addFiles(data.files);
+              } else if (data.text) {
+                tabBtnText.click();
+                textInput.value = data.text;
+                textInput.dispatchEvent(new Event("input"));
+              }
+            }
+          };
+        };
+      } catch (err) {
+        console.warn("[PWA] Could not read shared target payload:", err);
+      }
+    }
+    window.addEventListener("DOMContentLoaded", checkIncomingShare);
+    checkIncomingShare();
   </script>
 </body>
 </html>

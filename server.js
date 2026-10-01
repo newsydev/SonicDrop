@@ -43,6 +43,7 @@ const MIME = {
   ".png":  "image/png",
   ".svg":  "image/svg+xml",
   ".json": "application/json",
+  ".webmanifest": "application/manifest+json",
 };
 
 // ─── serveFile helper ─────────────────────────────────────────────────────────
@@ -52,11 +53,10 @@ function serveFile(fp, res) {
   res.writeHead(200, {
     "Content-Type":  mime,
     "Cache-Control": "no-cache",
+    "Service-Worker-Allowed": "/",
     "Cross-Origin-Opener-Policy":   "same-origin",
     "Cross-Origin-Embedder-Policy": "require-corp",
     // Skip ngrok's browser-warning interstitial for all responses.
-    // Without this, ngrok blocks page loads AND WebSocket upgrades
-    // when the client hasn't yet visited the tunnel URL in a browser.
     "ngrok-skip-browser-warning":   "true",
   });
   fs.createReadStream(fp).pipe(res);
@@ -65,6 +65,13 @@ function serveFile(fp, res) {
 // ─── HTTP Server (static file serving) ───────────────────────────────────────
 const httpServer = http.createServer((req, res) => {
   let urlPath = req.url.split("?")[0];
+
+  // Fallback for Web Share Target POST if service worker not yet activated
+  if (req.method === "POST" && urlPath === "/share-target") {
+    res.writeHead(303, { Location: "/sender" });
+    res.end();
+    return;
+  }
 
   // Clean URL routing
   const cleanRoutes = { "/": "/index.html", "/sender": "/sender.html" };
