@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SonicDrop — Send</title>
 
   <!-- Google Fonts -->
@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet" />
 
-  <!-- ggwave (served locally — WASM is base64-embedded, no external fetch needed) -->
+  <!-- ggwave (served locally) -->
   <script src="/ggwave.js"></script>
 
   <style>
@@ -19,11 +19,12 @@
     :root {
       --bg:        #07071a;
       --surface:   #0f0f2e;
-      --border:    rgba(168,85,247,0.18);
-      --brand:     #a78bfa;
-      --brand-dim: rgba(167,139,250,0.1);
+      --border:    rgba(120,119,255,0.18);
+      --brand:     #8b5cf6;
+      --brand-rgb: 139,92,246;
+      --brand-dim: rgba(139,92,246,0.12);
       --text:      #e8e8f4;
-      --muted:     #6b6b8a;
+      --muted:     #8a8aa8;
       --success:   #34d399;
       --warn:      #fbbf24;
       --danger:    #f87171;
@@ -39,119 +40,172 @@
 
     body {
       min-height: 100vh;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem 1rem;
       overflow-x: hidden;
       position: relative;
     }
 
+    /* ── Background ── */
     .bg-noise {
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      position: fixed; inset: 0; z-index: 0;
       background-image:
-        radial-gradient(ellipse 80% 60% at 80% -10%, rgba(168,85,247,0.16) 0%, transparent 60%),
+        radial-gradient(ellipse 80% 60% at 80% -10%, rgba(139,92,246,0.18) 0%, transparent 60%),
         radial-gradient(ellipse 60% 50% at 20% 110%, rgba(99,102,241,0.12) 0%, transparent 60%);
+      pointer-events: none;
     }
 
-    .container { position: relative; z-index: 1; width: 100%; max-width: 440px; }
+    /* ── Layout ── */
+    .container { position: relative; z-index: 1; width: 100%; max-width: 480px; }
 
     /* ── Header ── */
-    .header { text-align: center; margin-bottom: 2rem; }
+    .header { text-align: center; margin-bottom: 1.5rem; }
     .badge {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 4px 12px; border-radius: 99px;
       background: var(--brand-dim); border: 1px solid var(--border);
       font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
       text-transform: uppercase; color: var(--brand);
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
     }
-    .badge-dot { width:6px; height:6px; border-radius:50%; background:var(--brand); animation:blink 2s ease-in-out infinite; }
+    .badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--brand);
+      animation: blink 2s ease-in-out infinite;
+    }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
     .logo {
-      font-size: 2.6rem; font-weight: 900; letter-spacing: -0.03em;
-      background: linear-gradient(135deg, #c084fc 0%, #a78bfa 40%, #818cf8 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-      line-height: 1; margin-bottom: 0.5rem;
+      font-size: 2.4rem; font-weight: 900; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #c084fc 0%, #a855f7 40%, #818cf8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+      margin-bottom: 0.4rem;
     }
-    .subtitle { font-size: 0.875rem; color: var(--muted); }
+    .subtitle { font-size: 0.85rem; color: var(--muted); font-weight: 400; }
 
     /* ── Card ── */
     .card {
-      background: rgba(15,10,46,0.65);
+      background: rgba(15, 15, 46, 0.72);
       border: 1px solid var(--border);
-      border-radius: 20px; padding: 2rem;
-      backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px);
+      border-radius: 20px;
+      padding: 1.75rem;
+      backdrop-filter: blur(32px);
+      -webkit-backdrop-filter: blur(32px);
       box-shadow: 0 0 0 1px rgba(0,0,0,0.3), 0 32px 64px rgba(0,0,0,0.4);
+    }
+
+    /* ── Tabs ── */
+    .tabs-row {
+      display: flex; gap: 6px; padding: 4px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; margin-bottom: 1.25rem;
+    }
+    .tab-btn {
+      flex: 1; padding: 8px 12px; border-radius: 8px; border: none;
+      background: transparent; color: var(--muted); font-size: 0.82rem;
+      font-weight: 600; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .tab-btn.active {
+      background: rgba(139,92,246,0.22);
+      color: #fff;
+      border: 1px solid rgba(139,92,246,0.4);
     }
 
     /* ── Phases ── */
     .phase { display: none; }
     .phase.active { display: block; animation: fadeUp 0.35s ease forwards; }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(10px); }
+      to   { opacity:1; transform:translateY(0);    }
+    }
 
-    /* ── Drop zone ── */
+    /* ── Drop Zone ── */
     .drop-zone {
+      border: 2px dashed rgba(139,92,246,0.35);
+      border-radius: 16px;
+      padding: 1.75rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: rgba(139,92,246,0.03);
       position: relative;
-      border: 2px dashed rgba(255,255,255,0.1);
-      border-radius: 14px; padding: 2rem 1rem;
-      text-align: center; cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      margin-bottom: 1rem;
+      margin-bottom: 1.25rem;
     }
     .drop-zone:hover, .drop-zone.drag-over {
       border-color: var(--brand);
-      background: var(--brand-dim);
+      background: rgba(139,92,246,0.08);
+      box-shadow: 0 0 24px rgba(139,92,246,0.15) inset;
     }
-    .drop-zone input[type=file] {
-      position: absolute; inset: 0; opacity: 0;
-      width: 100%; height: 100%; cursor: pointer;
-    }
-    .drop-icon-wrap {
-      width: 52px; height: 52px; border-radius: 12px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
+    .drop-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--brand-dim); border: 1px solid rgba(139,92,246,0.3);
       display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 0.875rem; color: var(--muted);
-      transition: border-color 0.2s, color 0.2s;
+      margin: 0 auto 0.75rem;
+      color: var(--brand);
     }
-    .drop-zone:hover .drop-icon-wrap { border-color: rgba(167,139,250,0.35); color: var(--brand); }
-    .drop-icon-wrap svg { width: 22px; height: 22px; }
-    .drop-label { font-size: 0.875rem; font-weight: 600; color: var(--text); margin-bottom: 3px; }
-    .drop-label span { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
-    .drop-hint { font-size: 0.75rem; color: var(--muted); }
+    .drop-title { font-weight: 600; font-size: 0.95rem; color: #fff; margin-bottom: 0.25rem; }
+    .drop-sub   { font-size: 0.78rem; color: var(--muted); }
 
-    /* Selected file */
-    .file-info-row {
-      display: none; align-items: center; gap: 10px;
-      background: var(--brand-dim);
-      border: 1px solid rgba(167,139,250,0.2);
-      border-radius: 10px; padding: 0.75rem;
+    /* ── Multi-file list ── */
+    .selected-files-list {
+      display: flex; flex-direction: column; gap: 8px;
+      max-height: 180px; overflow-y: auto; padding-right: 2px;
+      margin-bottom: 1.25rem;
     }
-    .file-info-row.visible { display: flex; }
-    .file-icon {
-      width: 38px; height: 38px; border-radius: 9px; flex-shrink: 0;
-      background: rgba(167,139,250,0.12);
-      border: 1px solid rgba(167,139,250,0.25);
-      display: flex; align-items: center; justify-content: center; color: var(--brand);
+    .selected-file-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; border-radius: 10px;
+      background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.18);
     }
-    .file-icon svg { width: 18px; height: 18px; }
-    .file-name { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex:1; }
-    .file-meta { font-size: 0.73rem; color: var(--muted); margin-top: 1px; }
-    .btn-clear {
-      width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0;
-      border: none; background: transparent; cursor: pointer;
-      color: var(--muted); display: flex; align-items: center; justify-content: center;
-      transition: color 0.15s, background 0.15s;
+    .selected-file-left {
+      display: flex; align-items: center; gap: 8px; min-width: 0;
     }
-    .btn-clear:hover { color: var(--danger); background: rgba(248,113,113,0.1); }
-    .btn-clear svg { width: 14px; height: 14px; }
+    .selected-file-name {
+      font-size: 0.82rem; font-weight: 600; color: #fff;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;
+    }
+    .selected-file-size { font-size: 0.72rem; color: var(--muted); }
+    .btn-remove-file {
+      background: transparent; border: none; color: var(--muted);
+      cursor: pointer; padding: 4px; display: flex; align-items: center;
+      transition: color 0.15s;
+    }
+    .btn-remove-file:hover { color: var(--danger); }
+
+    /* ── Text Input Area ── */
+    .text-input-wrap { margin-bottom: 1.25rem; }
+    .text-input-area {
+      width: 100%; min-height: 130px; max-height: 220px; resize: vertical;
+      background: rgba(255,255,255,0.03); border: 1.5px dashed rgba(139,92,246,0.35);
+      border-radius: 14px; padding: 0.85rem; color: var(--text); font-family: inherit;
+      font-size: 0.88rem; line-height: 1.5; outline: none; transition: border-color 0.2s;
+    }
+    .text-input-area:focus {
+      border-color: var(--brand); background: rgba(139,92,246,0.04);
+    }
+    .text-input-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted);
+    }
+    .btn-paste {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px; padding: 3px 8px; color: #cbd5e1; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem;
+    }
+    .btn-paste:hover { background: rgba(255,255,255,0.12); color: #fff; }
 
     /* ── Buttons ── */
     .btn {
-      width: 100%; padding: 0.875rem 1.25rem;
+      width: 100%; padding: 0.85rem 1.25rem;
       border: none; border-radius: 12px;
-      font-family: inherit; font-size: 0.95rem; font-weight: 600;
+      font-family: inherit; font-size: 0.92rem; font-weight: 600;
       cursor: pointer; transition: all 0.18s ease;
       display: flex; align-items: center; justify-content: center; gap: 8px;
     }
@@ -160,149 +214,122 @@
       background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
       color: #fff;
       box-shadow: 0 4px 20px rgba(139,92,246,0.35), 0 1px 0 rgba(255,255,255,0.08) inset;
-      margin-top: 0.75rem;
     }
-    .btn-primary:hover { box-shadow: 0 6px 28px rgba(139,92,246,0.5); filter: brightness(1.07); }
-    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; transform: none; filter: none; }
+    .btn-primary:hover:not(:disabled) { box-shadow: 0 6px 28px rgba(139,92,246,0.5); filter: brightness(1.06); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
     .btn-ghost {
       background: rgba(255,255,255,0.04);
       border: 1px solid rgba(255,255,255,0.08);
-      color: var(--muted); margin-top: 0.625rem;
+      color: var(--muted);
+      margin-top: 0.625rem;
     }
-    .btn-ghost:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.07); color: var(--text); border-color: rgba(255,255,255,0.14); }
 
-    /* ── Mic listening ── */
+    /* ── Status chips & mic ── */
     .icon-wrap {
-      width: 72px; height: 72px; border-radius: 50%;
+      width: 68px; height: 68px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 1.25rem; position: relative;
+      margin: 0 auto 1.25rem;
     }
     .icon-wrap svg { width: 30px; height: 30px; }
-    .icon-brand { background: rgba(124,127,255,0.1); border: 1px solid rgba(124,127,255,0.3); color: #818cf8; }
-    .icon-warn  { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); color: var(--warn); }
+    .icon-brand  { background: var(--brand-dim); border: 1px solid rgba(139,92,246,0.3); color: var(--brand); }
+    .icon-warn   { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); color: var(--warn); }
     .icon-success{ background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: var(--success); }
 
-    .mic-pulse { animation: micPulseAnim 1.6s ease-out infinite; }
-    @keyframes micPulseAnim {
-      0%   { box-shadow: 0 0 0 0 rgba(124,127,255,0.45); }
-      70%  { box-shadow: 0 0 0 20px rgba(124,127,255,0); }
-      100% { box-shadow: 0 0 0 0 rgba(124,127,255,0); }
+    .mic-pulse { animation: micGlow 1.8s ease-in-out infinite alternate; }
+    @keyframes micGlow {
+      from { box-shadow: 0 0 0 0 rgba(139,92,246,0.4); }
+      to   { box-shadow: 0 0 0 16px rgba(139,92,246,0); }
     }
 
-    .spin { animation: spinAnim 1.4s linear infinite; }
-    @keyframes spinAnim { to{ transform: rotate(360deg); } }
-
-    /* Mic bars (animated live) */
-    .mic-bars {
-      display: flex; align-items: flex-end; justify-content: center;
-      gap: 3px; height: 32px; margin: 0.25rem auto 1.25rem;
-    }
-    .mic-bar {
-      width: 4px; border-radius: 2px;
-      background: linear-gradient(to top, #6366f1, #a78bfa);
-      animation: micBar 0.7s ease-in-out infinite alternate;
-    }
-    .mic-bar:nth-child(1){height:25%;animation-delay:0s}
-    .mic-bar:nth-child(2){height:50%;animation-delay:.08s}
-    .mic-bar:nth-child(3){height:80%;animation-delay:.16s}
-    .mic-bar:nth-child(4){height:100%;animation-delay:.24s}
-    .mic-bar:nth-child(5){height:80%;animation-delay:.32s}
-    .mic-bar:nth-child(6){height:50%;animation-delay:.40s}
-    .mic-bar:nth-child(7){height:25%;animation-delay:.48s}
-    @keyframes micBar { from{transform:scaleY(0.35)} to{transform:scaleY(1)} }
-
-    /* ── Status chip ── */
     .status-chip {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 5px 12px; border-radius: 99px;
-      font-size: 0.78rem; font-weight: 600; margin-bottom: 1rem;
+      font-size: 0.78rem; font-weight: 600;
+      margin-bottom: 1.25rem;
     }
-    .chip-dot { width:6px; height:6px; border-radius:50%; }
-    .chip-blue  { background:rgba(96,165,250,0.1); border:1px solid rgba(96,165,250,0.22); color:#93c5fd; }
-    .chip-amber { background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.22); color:#fcd34d; }
+    .chip-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .chip-blue  { background: rgba(96,165,250,0.12); border:1px solid rgba(96,165,250,0.25); color:#93c5fd; }
+    .chip-amber { background: rgba(251,191,36,0.1);  border:1px solid rgba(251,191,36,0.25); color:#fcd34d; }
+
+    .mic-bars { display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 28px; margin-bottom: 1.25rem; }
+    .mic-bar {
+      width: 4px; border-radius: 2px; background: var(--brand); opacity: 0.8;
+      animation: micBounce 0.7s ease-in-out infinite alternate;
+    }
+    .mic-bar:nth-child(1){height:25%;animation-delay:0s}
+    .mic-bar:nth-child(2){height:50%;animation-delay:.08s}
+    .mic-bar:nth-child(3){height:75%;animation-delay:.16s}
+    .mic-bar:nth-child(4){height:100%;animation-delay:.24s}
+    .mic-bar:nth-child(5){height:75%;animation-delay:.32s}
+    .mic-bar:nth-child(6){height:50%;animation-delay:.40s}
+    .mic-bar:nth-child(7){height:25%;animation-delay:.48s}
+    @keyframes micBounce {
+      from { transform: scaleY(0.3); }
+      to   { transform: scaleY(1);   }
+    }
 
     /* ── Manual Room ID ── */
     .manual-section {
-      display: none; border-top: 1px solid rgba(255,255,255,0.06);
-      padding-top: 1.25rem; margin-top: 0.25rem;
+      display: none; background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; padding: 1.25rem; margin-top: 1rem;
     }
-    .manual-section.visible { display: block; animation: fadeUp 0.3s ease forwards; }
-    .manual-label { font-size: 0.78rem; color: var(--muted); text-align: center; margin-bottom: 0.75rem; }
-    .room-inputs { display: flex; gap: 8px; justify-content: center; margin-bottom: 0.875rem; }
+    .manual-section.visible { display: block; }
+    .manual-label { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; text-align: center; }
+    .room-inputs { display: flex; gap: 8px; justify-content: center; margin-bottom: 1rem; }
     .room-input {
-      font-family: 'JetBrains Mono', monospace;
-      width: 52px; height: 60px;
-      text-align: center; text-transform: uppercase;
-      font-size: 1.5rem; font-weight: 700;
-      background: rgba(167,139,250,0.07);
-      border: 1.5px solid rgba(167,139,250,0.25);
-      border-radius: 10px; color: #c4b5fd;
-      caret-color: var(--brand);
-      transition: border-color 0.15s, box-shadow 0.15s;
-      outline: none;
+      width: 48px; height: 56px; border-radius: 10px;
+      background: rgba(255,255,255,0.05); border: 1.5px solid rgba(139,92,246,0.3);
+      color: #fff; font-size: 1.5rem; font-weight: 700; text-align: center;
+      font-family: 'JetBrains Mono', monospace; text-transform: uppercase; outline: none;
     }
-    .room-input:focus {
-      border-color: var(--brand);
-      box-shadow: 0 0 0 3px rgba(167,139,250,0.15);
-    }
+    .room-input:focus { border-color: var(--brand); box-shadow: 0 0 12px rgba(139,92,246,0.3); }
 
-    /* ── Progress section ── */
+    /* ── Progress ── */
     .file-info-row-t {
       display: flex; align-items: center; gap: 12px;
-      background: rgba(167,139,250,0.07);
-      border: 1px solid rgba(167,139,250,0.15);
-      border-radius: 12px; padding: 0.875rem;
-      margin-bottom: 1.25rem;
+      background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.18);
+      border-radius: 12px; padding: 0.85rem; margin-bottom: 1.25rem;
     }
+    .file-name { font-weight: 600; font-size: 0.88rem; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+    .file-meta { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
     .progress-track {
-      height: 6px; background: rgba(255,255,255,0.06);
-      border-radius: 99px; overflow: hidden; margin-bottom: 0.5rem;
+      width: 100%; height: 6px; background: rgba(255,255,255,0.06);
+      border-radius: 99px; overflow: hidden; margin-bottom: 0.625rem;
     }
     .progress-fill {
-      height: 100%; border-radius: 99px;
-      background: linear-gradient(90deg, #8b5cf6, #c084fc, #8b5cf6);
-      background-size: 200% 100%;
-      animation: shimmer 1.8s linear infinite;
-      transition: width 0.25s ease;
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #8b5cf6, #6366f1);
+      border-radius: 99px; transition: width 0.15s ease;
+      box-shadow: 0 0 8px rgba(139,92,246,0.5);
     }
-    @keyframes shimmer { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
-    .progress-fill.done { animation: none; background: var(--success); }
+    .progress-fill.done { background: linear-gradient(90deg, #10b981, #34d399); box-shadow: 0 0 8px rgba(52,211,153,0.5); }
     .stats-row {
       display: flex; justify-content: space-between;
-      font-size: 0.75rem; color: var(--muted); margin-bottom: 1rem;
+      font-size: 0.76rem; color: var(--muted); margin-bottom: 1.25rem;
+      font-variant-numeric: tabular-nums;
     }
-    .stats-row span:first-child { color: var(--brand); font-weight: 600; }
 
-    /* ── Done ── */
-    .ping-ring {
-      position: absolute; inset: 0; border-radius: 50%;
-      background: rgba(52,211,153,0.2);
-      animation: pingRing 1.5s ease-out infinite;
-    }
-    @keyframes pingRing { 0%{transform:scale(0.9);opacity:0.8} 100%{transform:scale(1.6);opacity:0} }
-
-    .phase-title { font-size: 1.2rem; font-weight: 700; text-align: center; margin-bottom: 0.4rem; }
-    .phase-body  { font-size: 0.875rem; color: var(--muted); text-align: center; line-height: 1.6; margin-bottom: 1.5rem; }
-
-    /* ── Error ── */
+    /* ── Error banner ── */
     .error-bar {
-      display: none; align-items: flex-start; gap: 8px;
-      background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.25);
-      border-radius: 10px; padding: 0.75rem; margin-top: 1rem;
-      font-size: 0.825rem; color: #fca5a5;
+      display: none; align-items: center; gap: 8px;
+      padding: 0.75rem 1rem; border-radius: 10px;
+      background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25);
+      color: var(--danger); font-size: 0.8rem; margin-top: 1rem;
     }
     .error-bar.visible { display: flex; }
-    .error-bar svg { width:16px; height:16px; flex-shrink:0; margin-top:1px; }
+    .error-bar svg { width: 16px; height: 16px; flex-shrink: 0; }
 
     /* ── Footer ── */
-    .footer { text-align:center; margin-top:1.5rem; font-size:0.75rem; color:#3a3a55; }
-    .footer a { color: var(--brand); opacity:0.5; text-decoration:none; }
-    .footer a:hover { opacity:1; }
+    .footer { text-align: center; margin-top: 1.5rem; font-size: 0.75rem; color: var(--muted); }
+    .footer a { color: var(--brand); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
   </style>
 </head>
-
 <body>
-  <div class="bg-noise" aria-hidden="true"></div>
+  <div class="bg-noise"></div>
 
   <div class="container">
 
@@ -312,65 +339,86 @@
         <span class="badge-dot"></span>
         Sender Mode
       </div>
-      <div class="logo">SonicDrop</div>
-      <p class="subtitle">Select a file and send it acoustically — no cables, no QR codes</p>
+      <h1 class="logo">SonicDrop</h1>
+      <p class="subtitle">Acoustic zero-pairing · Instant local transfer</p>
     </div>
 
-    <!-- Card -->
+    <!-- Main Card -->
     <div class="card">
 
       <!-- ══ Phase: Select ══ -->
       <div id="phase-select" class="phase active">
 
-        <!-- Drop zone -->
-        <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="Click or drag to select file">
-          <input type="file" id="file-input" tabindex="-1" />
+        <!-- Tabs: Files vs Text -->
+        <div class="tabs-row">
+          <button type="button" class="tab-btn active" id="tab-btn-file">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            Send Files
+          </button>
+          <button type="button" class="tab-btn" id="tab-btn-text">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            Text / Link
+          </button>
+        </div>
 
-          <div id="drop-placeholder">
-            <div class="drop-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+        <!-- Mode: Files -->
+        <div id="section-file-mode">
+          <input type="file" id="file-input" multiple style="display:none" />
+          <div class="drop-zone" id="drop-zone" tabindex="0">
+            <div class="drop-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
               </svg>
             </div>
-            <p class="drop-label">Drop file here or <span>browse</span></p>
-            <p class="drop-hint">Any file type &middot; any size</p>
+            <p class="drop-title" id="drop-title-text">Choose file(s) or drag here</p>
+            <p class="drop-sub">Select one or multiple photos, videos, or documents</p>
+          </div>
+
+          <!-- Selected files list -->
+          <div id="selected-files-container" style="display:none">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem">
+              <span id="selected-summary-label" style="font-size:0.78rem;font-weight:600;color:var(--muted)">Selected Files:</span>
+              <button type="button" id="btn-clear-all" style="background:none;border:none;color:var(--danger);font-size:0.74rem;cursor:pointer">Clear All</button>
+            </div>
+            <div id="selected-files-list" class="selected-files-list"></div>
           </div>
         </div>
 
-        <!-- Selected file row (shown after pick) -->
-        <div class="file-info-row" id="file-info-row">
-          <div class="file-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
-            </svg>
+        <!-- Mode: Text / Clipboard -->
+        <div id="section-text-mode" style="display:none">
+          <div class="text-input-wrap">
+            <textarea id="text-input" class="text-input-area" placeholder="Type or paste a message, link, OTP, or Wi-Fi password…"></textarea>
+            <div class="text-input-footer">
+              <button type="button" class="btn-paste" id="btn-paste-clipboard">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                Paste Clipboard
+              </button>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span id="url-detector-badge" style="display:none;color:#60a5fa;font-weight:600">🔗 Link</span>
+                <span id="char-count-label">0 chars</span>
+              </div>
+            </div>
           </div>
-          <div style="min-width:0;flex:1">
-            <div class="file-name" id="selected-name">—</div>
-            <div class="file-meta" id="selected-meta">—</div>
-          </div>
-          <button class="btn-clear" id="btn-clear-file" title="Clear">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
         </div>
 
         <button id="btn-send" class="btn btn-primary" disabled>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
           </svg>
-          Send File
+          <span id="btn-send-label">Send File(s)</span>
         </button>
       </div>
 
       <!-- ══ Phase: Listening ══ -->
       <div id="phase-listening" class="phase" style="text-align:center">
-        <div class="icon-wrap icon-brand mic-pulse" style="width:80px;height:80px;margin-bottom:1.25rem">
+        <div class="icon-wrap icon-brand mic-pulse">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/>
           </svg>
         </div>
 
         <p class="phase-title">Listening for Beacon</p>
-        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem">Hold your phone near the desktop speaker</p>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem">Hold your phone near the receiver's speaker</p>
 
         <div class="status-chip chip-blue" style="margin:0 auto 0.75rem">
           <span class="chip-dot" style="background:#93c5fd;animation:blink 1.2s infinite"></span>
@@ -385,7 +433,7 @@
           <div class="mic-bar"></div>
         </div>
 
-        <!-- Manual fallback (shown after 5s timeout) -->
+        <!-- Manual fallback -->
         <div class="manual-section" id="manual-section">
           <p class="manual-label">⚠ Beacon not detected &mdash; enter Room ID manually:</p>
           <div class="room-inputs">
@@ -402,19 +450,20 @@
         <button id="btn-cancel-listen" class="btn btn-ghost">Cancel</button>
       </div>
 
-      <!-- ══ Phase: Connecting ══ -->
+      <!-- ══ Phase: Connecting & Awaiting Approval ══ -->
       <div id="phase-connecting" class="phase" style="text-align:center">
         <div class="icon-wrap icon-warn">
-          <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
           </svg>
         </div>
-        <p class="phase-title">Handshake Complete ✓</p>
-        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.625rem" id="decoded-room-display">Room ID decoded ✓</p>
+        <p class="phase-title" id="connect-title">Connecting…</p>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.75rem" id="decoded-room-display">Room ID decoded ✓</p>
         <div class="status-chip chip-amber" style="margin:0 auto">
           <span class="chip-dot" style="background:var(--warn);animation:blink 1s infinite"></span>
-          <span>Establishing P2P connection…</span>
+          <span id="status-connect">Waiting for receiver to accept…</span>
         </div>
+        <button id="btn-cancel-connect" class="btn btn-ghost" style="margin-top:1.25rem">Cancel</button>
       </div>
 
       <!-- ══ Phase: Transfer ══ -->
@@ -448,15 +497,14 @@
 
       <!-- ══ Phase: Done ══ -->
       <div id="phase-done" class="phase" style="text-align:center">
-        <div class="icon-wrap icon-success" style="width:80px;height:80px;margin-bottom:1.5rem">
-          <div class="ping-ring"></div>
+        <div class="icon-wrap icon-success" style="width:72px;height:72px;margin-bottom:1.25rem">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4.5 12.75l6 6 9-13.5"/>
           </svg>
         </div>
-        <p class="phase-title">File Sent!</p>
-        <p class="phase-body" id="done-meta">Transfer complete.</p>
-        <button id="btn-send-again" class="btn btn-primary" style="margin-top:0">Send Another File</button>
+        <p class="phase-title" id="done-title">Transfer Complete!</p>
+        <p class="phase-body" id="done-meta">Delivered to receiver.</p>
+        <button id="btn-send-again" class="btn btn-primary" style="margin-top:0">Send Another Item</button>
       </div>
 
       <!-- Error banner -->
@@ -483,14 +531,15 @@
     } from "/utils.js";
 
     // ── Phase ────────────────────────────────────────────────────────────────
-    const phases = ["select","listening","connecting","transfer","done"];
+    const phases = ["select", "listening", "connecting", "transfer", "done"];
     function showPhase(name) {
       phases.forEach(p => {
         const el = document.getElementById("phase-" + p);
-        el.classList.toggle("active", p === name);
+        if (el) el.classList.toggle("active", p === name);
       });
       document.getElementById("error-banner").classList.remove("visible");
     }
+
     function showError(msg) {
       document.getElementById("error-text").textContent = msg;
       document.getElementById("error-banner").classList.add("visible");
@@ -499,57 +548,175 @@
 
     // ── Constants ────────────────────────────────────────────────────────────
     const CHUNK_SIZE        = 64 * 1024;
-    const BP_HIGH           = 1024 * 1024; // 1 MB backpressure high-water mark
-    const BP_LOW            = 256  * 1024; // 256 KB backpressure low-water mark
+    const BP_HIGH           = 1024 * 1024; // 1 MB
+    const BP_LOW            = 256  * 1024; // 256 KB
     const ACOUSTIC_TIMEOUT  = 5000;
-    const PROTOCOL_US_FAST  = 9;
 
     // ── State ────────────────────────────────────────────────────────────────
-    let selectedFile=null, audioCtx=null, micStream=null;
-    let scriptProcessor=null, ggwaveInstance=null, ggwaveRxInst=null;
+    let currentMode = "file"; // 'file' | 'text'
+    let selectedFiles = [];   // File[]
+    let textPayload = "";
+
+    let audioCtx=null, micStream=null, scriptProcessor=null;
+    let ggwaveInstance=null, ggwaveRxInst=null;
     let ws=null, pc=null, dataChannel=null;
     let acousticTimer=null, countdownTimer=null;
     let sentBytes=0;
-    let transferCompleted=false, transferAckResolve=null;
+    let transferCompleted=false;
+    let transferDecisionResolve=null;
+    let transferAckResolve=null;
     const speedCalc = new SpeedCalculator();
 
+    // ── Tabs Switching ───────────────────────────────────────────────────────
+    const tabBtnFile = document.getElementById("tab-btn-file");
+    const tabBtnText = document.getElementById("tab-btn-text");
+    const secFile    = document.getElementById("section-file-mode");
+    const secText    = document.getElementById("section-text-mode");
+    const btnSend    = document.getElementById("btn-send");
+    const sendLabel  = document.getElementById("btn-send-label");
+
+    tabBtnFile.addEventListener("click", () => {
+      currentMode = "file";
+      tabBtnFile.classList.add("active");
+      tabBtnText.classList.remove("active");
+      secFile.style.display = "";
+      secText.style.display = "none";
+      sendLabel.textContent = selectedFiles.length > 1 ? `Send ${selectedFiles.length} Files` : "Send File(s)";
+      btnSend.disabled = selectedFiles.length === 0;
+    });
+
+    tabBtnText.addEventListener("click", () => {
+      currentMode = "text";
+      tabBtnText.classList.add("active");
+      tabBtnFile.classList.remove("active");
+      secFile.style.display = "none";
+      secText.style.display = "";
+      sendLabel.textContent = isUrl(textPayload.trim()) ? "Send Link" : "Send Text";
+      btnSend.disabled = textPayload.trim().length === 0;
+    });
+
     // ── File Selection ───────────────────────────────────────────────────────
-    const dropZone    = document.getElementById("drop-zone");
-    const fileInput   = document.getElementById("file-input");
-    const fileInfoRow = document.getElementById("file-info-row");
-    const btnSend     = document.getElementById("btn-send");
+    const dropZone   = document.getElementById("drop-zone");
+    const fileInput  = document.getElementById("file-input");
+    const filesList  = document.getElementById("selected-files-list");
+    const filesCont  = document.getElementById("selected-files-container");
+    const summaryLbl = document.getElementById("selected-summary-label");
+    const btnClearAll= document.getElementById("btn-clear-all");
 
-    function setFile(file) {
-      if (!file) return;
-      selectedFile = file;
-      document.getElementById("selected-name").textContent = file.name;
-      document.getElementById("selected-meta").textContent = `${formatBytes(file.size)} · ${file.type||"unknown"}`;
-      document.getElementById("drop-placeholder").style.display = "none";
-      fileInfoRow.classList.add("visible");
+    function addFiles(newFiles) {
+      if (!newFiles || newFiles.length === 0) return;
+      // Filter out duplicate names
+      const existingNames = new Set(selectedFiles.map(f => f.name + f.size));
+      for (const f of newFiles) {
+        if (!existingNames.has(f.name + f.size)) {
+          selectedFiles.push(f);
+        }
+      }
+      renderSelectedFiles();
+    }
+
+    function removeFile(index) {
+      selectedFiles.splice(index, 1);
+      renderSelectedFiles();
+    }
+
+    function clearFiles() {
+      selectedFiles = [];
+      fileInput.value = "";
+      renderSelectedFiles();
+    }
+
+    function renderSelectedFiles() {
+      filesList.innerHTML = "";
+      if (selectedFiles.length === 0) {
+        filesCont.style.display = "none";
+        document.getElementById("drop-title-text").textContent = "Choose file(s) or drag here";
+        btnSend.disabled = true;
+        sendLabel.textContent = "Send File(s)";
+        return;
+      }
+
+      filesCont.style.display = "block";
+      const totalBytes = selectedFiles.reduce((acc, f) => acc + f.size, 0);
+      summaryLbl.textContent = `${selectedFiles.length} file${selectedFiles.length > 1 ? "s" : ""} (${formatBytes(totalBytes)}):`;
+
+      selectedFiles.forEach((file, idx) => {
+        const item = document.createElement("div");
+        item.className = "selected-file-item";
+        item.innerHTML = `
+          <div class="selected-file-left">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            <div>
+              <div class="selected-file-name" title="${file.name}">${file.name}</div>
+              <div class="selected-file-size">${formatBytes(file.size)}</div>
+            </div>
+          </div>
+          <button type="button" class="btn-remove-file" title="Remove">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        `;
+        item.querySelector(".btn-remove-file").addEventListener("click", (e) => {
+          e.stopPropagation();
+          removeFile(idx);
+        });
+        filesList.appendChild(item);
+      });
+
       btnSend.disabled = false;
-    }
-    function clearFile() {
-      selectedFile = null; fileInput.value = "";
-      document.getElementById("drop-placeholder").style.display = "";
-      fileInfoRow.classList.remove("visible");
-      btnSend.disabled = true;
+      sendLabel.textContent = selectedFiles.length === 1 ? "Send 1 File" : `Send ${selectedFiles.length} Files`;
     }
 
-    fileInput.addEventListener("change", e => setFile(e.target.files[0]));
-    document.getElementById("btn-clear-file").addEventListener("click", e => { e.stopPropagation(); clearFile(); });
+    fileInput.addEventListener("change", e => addFiles(Array.from(e.target.files)));
+    btnClearAll.addEventListener("click", clearFiles);
+
+    dropZone.addEventListener("click", () => fileInput.click());
     dropZone.addEventListener("dragover",  e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
     dropZone.addEventListener("dragleave", ()  => dropZone.classList.remove("drag-over"));
     dropZone.addEventListener("drop", e => {
-      e.preventDefault(); dropZone.classList.remove("drag-over"); setFile(e.dataTransfer.files[0]);
+      e.preventDefault();
+      dropZone.classList.remove("drag-over");
+      if (e.dataTransfer.files?.length) addFiles(Array.from(e.dataTransfer.files));
     });
-    dropZone.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" ") fileInput.click(); });
+    dropZone.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") fileInput.click(); });
+
+    // ── Text Mode ────────────────────────────────────────────────────────────
+    const textInput   = document.getElementById("text-input");
+    const charCount   = document.getElementById("char-count-label");
+    const urlDetector = document.getElementById("url-detector-badge");
+    const btnPaste    = document.getElementById("btn-paste-clipboard");
+
+    textInput.addEventListener("input", e => {
+      textPayload = e.target.value;
+      const len = textPayload.length;
+      charCount.textContent = `${len} char${len !== 1 ? "s" : ""}`;
+      const isAUrl = isUrl(textPayload.trim());
+      urlDetector.style.display = isAUrl ? "inline-block" : "none";
+      if (currentMode === "text") {
+        sendLabel.textContent = isAUrl ? "Send Link" : "Send Text";
+        btnSend.disabled = textPayload.trim().length === 0;
+      }
+    });
+
+    btnPaste.addEventListener("click", async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        textInput.value = text;
+        textInput.dispatchEvent(new Event("input"));
+      } catch (err) {
+        showError("Could not read clipboard. Please paste manually.");
+      }
+    });
+
+    function isUrl(str) {
+      try {
+        const u = new URL(str);
+        return u.protocol === "http:" || u.protocol === "https:";
+      } catch { return false; }
+    }
 
     // ── ggwave ───────────────────────────────────────────────────────────────
-    // Poll until ggwave_factory is available (race with <script> tag), then
-    // await the Emscripten .ready Promise before using any API.
     async function initGgwave() {
       if (ggwaveInstance) return ggwaveInstance;
-
       await new Promise((resolve, reject) => {
         let tries = 0;
         const check = () => {
@@ -559,13 +726,12 @@
         };
         check();
       });
-
       const instance = await ggwave_factory();
       ggwaveInstance = instance;
       return ggwaveInstance;
     }
 
-    // ── Acoustic listen ──────────────────────────────────────────────────────
+    // ── Acoustic Listen ──────────────────────────────────────────────────────
     async function startListening() {
       const gw = await initGgwave();
       try {
@@ -573,7 +739,7 @@
           audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:1, sampleRate:48000 }
         });
       } catch(err) {
-        showError(err.name==="NotAllowedError"
+        showError(err.name === "NotAllowedError"
           ? "Microphone access denied. Please allow mic and retry."
           : "Cannot open microphone: " + err.message);
         showPhase("select"); return;
@@ -582,15 +748,13 @@
       audioCtx = new AudioContext({ sampleRate: 48000 });
       const source = audioCtx.createMediaStreamSource(micStream);
 
-      // samplesPerFrame must be ≤ 1024 in ggwave v0.4.0
-      // ScriptProcessorNode buffer size must match samplesPerFrame
       const params = gw.getDefaultParameters();
       params.sampleRate      = 48000;
       params.samplesPerFrame = 1024;
       params.operatingMode   = gw.GGWAVE_OPERATING_MODE_RX | gw.GGWAVE_OPERATING_MODE_USE_DSS;
       ggwaveRxInst = gw.init(params);
 
-      scriptProcessor = audioCtx.createScriptProcessor(1024, 1, 1); // must match samplesPerFrame
+      scriptProcessor = audioCtx.createScriptProcessor(1024, 1, 1);
       scriptProcessor.onaudioprocess = (ev) => {
         const f32 = ev.inputBuffer.getChannelData(0);
         const i16 = new Int16Array(f32.length);
@@ -606,13 +770,11 @@
       source.connect(scriptProcessor);
       scriptProcessor.connect(audioCtx.destination);
 
-      // Countdown
       let rem = Math.ceil(ACOUSTIC_TIMEOUT / 1000);
       const cdEl = document.getElementById("listen-countdown");
       cdEl.textContent = ` ${rem}s`;
       countdownTimer = setInterval(() => { rem -= 1; cdEl.textContent = ` ${Math.max(0, rem)}s`; }, 1000);
 
-      // Timeout → show manual entry
       acousticTimer = setTimeout(() => {
         stopMic();
         document.getElementById("listen-status").textContent = "Beacon not detected";
@@ -620,17 +782,16 @@
       }, ACOUSTIC_TIMEOUT);
     }
 
-
     function stopMic() {
       clearTimeout(acousticTimer); clearInterval(countdownTimer);
-      acousticTimer=null; countdownTimer=null;
+      acousticTimer = null; countdownTimer = null;
       try { scriptProcessor?.disconnect(); } catch{}
       try { audioCtx?.close(); } catch{}
-      micStream?.getTracks().forEach(t=>t.stop());
-      micStream=null; scriptProcessor=null; audioCtx=null;
-      if (ggwaveRxInst!==null&&ggwaveInstance) {
+      micStream?.getTracks().forEach(t => t.stop());
+      micStream = null; scriptProcessor = null; audioCtx = null;
+      if (ggwaveRxInst !== null && ggwaveInstance) {
         try { ggwaveInstance.free(ggwaveRxInst); } catch{}
-        ggwaveRxInst=null;
+        ggwaveRxInst = null;
       }
     }
 
@@ -646,21 +807,21 @@
     manualInputs.forEach((inp, idx) => {
       inp.addEventListener("input", e => {
         inp.value = e.target.value.replace(/[^A-Za-z0-9]/g,"").toUpperCase().slice(-1);
-        if (inp.value && idx < manualInputs.length-1) manualInputs[idx+1].focus();
-        document.getElementById("btn-manual-connect").disabled = !manualInputs.every(i=>/^[A-Z0-9]$/.test(i.value));
+        if (inp.value && idx < manualInputs.length - 1) manualInputs[idx + 1].focus();
+        document.getElementById("btn-manual-connect").disabled = !manualInputs.every(i => /^[A-Z0-9]$/.test(i.value));
       });
-      inp.addEventListener("keydown", e => { if(e.key==="Backspace"&&!inp.value&&idx>0) manualInputs[idx-1].focus(); });
+      inp.addEventListener("keydown", e => { if (e.key === "Backspace" && !inp.value && idx > 0) manualInputs[idx - 1].focus(); });
       inp.addEventListener("paste", e => {
         e.preventDefault();
-        const p = (e.clipboardData.getData("text")||"").replace(/[^A-Za-z0-9]/g,"").toUpperCase().slice(0,4);
-        p.split("").forEach((ch,i) => { if(manualInputs[i]) manualInputs[i].value=ch; });
-        document.getElementById("btn-manual-connect").disabled = !manualInputs.every(i=>/^[A-Z0-9]$/.test(i.value));
-        manualInputs[Math.min(p.length,3)].focus();
+        const p = (e.clipboardData.getData("text") || "").replace(/[^A-Za-z0-9]/g,"").toUpperCase().slice(0, 4);
+        p.split("").forEach((ch, i) => { if (manualInputs[i]) manualInputs[i].value = ch; });
+        document.getElementById("btn-manual-connect").disabled = !manualInputs.every(i => /^[A-Z0-9]$/.test(i.value));
+        manualInputs[Math.min(p.length, 3)].focus();
       });
     });
     document.getElementById("btn-manual-connect").addEventListener("click", () => {
-      const id = manualInputs.map(i=>i.value).join("");
-      if (id.length!==4) return;
+      const id = manualInputs.map(i => i.value).join("");
+      if (id.length !== 4) return;
       document.getElementById("decoded-room-display").textContent = `Room: ${id} (manual) ✓`;
       showPhase("connecting");
       connectAndSend(id);
@@ -669,33 +830,33 @@
     // ── Signaling + WebRTC ────────────────────────────────────────────────────
     function connectAndSend(roomId) {
       ws = createSignalingSocket();
-      ws.onopen = () => ws.send(JSON.stringify({ type:"join-room", roomId }));
+      ws.onopen = () => ws.send(JSON.stringify({ type: "join-room", roomId }));
       ws.onmessage = async e => {
         const msg = JSON.parse(e.data);
-        if      (msg.type==="room-joined") await startWebRTCSender(roomId);
-        else if (msg.type==="signal")      await handleSignal(msg.data, roomId);
-        else if (msg.type==="peer-left")   {
+        if      (msg.type === "room-joined") await startWebRTCSender(roomId);
+        else if (msg.type === "signal")      await handleSignal(msg.data, roomId);
+        else if (msg.type === "peer-left")   {
           if (!transferCompleted) {
             showError("Receiver disconnected.");
             teardown();
           }
         }
-        else if (msg.type==="error")       showError("Server: " + msg.message);
+        else if (msg.type === "error")       showError("Server: " + msg.message);
       };
       ws.onerror = () => showError("WebSocket failed. Is the server running?");
     }
+
     function sendSignal(roomId, data) {
-      if (ws?.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:"signal",roomId,data}));
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "signal", roomId, data }));
     }
 
     async function startWebRTCSender(roomId) {
-      pc = new RTCPeerConnection(RTC_CONFIG);  // iceCandidatePoolSize pre-warms here
+      pc = new RTCPeerConnection(RTC_CONFIG);
 
       pc.onicecandidate = ({ candidate }) => {
         if (candidate) sendSignal(roomId, { type: "ice-candidate", candidate });
       };
 
-      // Show granular ICE state in the connecting UI
       pc.oniceconnectionstatechange = () => {
         const s = pc.iceConnectionState;
         console.log("[ICE]", s);
@@ -703,8 +864,8 @@
         if (!el) return;
         const labels = {
           "checking":     "Checking ICE candidates…",
-          "connected":    "ICE connected ✓  Finalizing…",
-          "completed":    "ICE complete ✓",
+          "connected":    "ICE connected ✓  Waiting for approval…",
+          "completed":    "Waiting for receiver to accept…",
           "failed":       "ICE failed — retrying…",
           "disconnected": "ICE disconnected…",
         };
@@ -721,17 +882,21 @@
         bufferedAmountLowThreshold: BP_LOW,
       });
       dataChannel.binaryType = "arraybuffer";
-      dataChannel.onopen  = () => {
-        showPhase("transfer");
-        document.getElementById("sending-name").textContent = selectedFile.name;
-        document.getElementById("sending-meta").textContent =
-          `${formatBytes(selectedFile.size)} · ${selectedFile.type || "unknown"}`;
-        beginTransfer();
+
+      dataChannel.onopen = () => {
+        document.getElementById("status-connect").textContent = "Waiting for receiver to accept…";
+        initiateHandshake();
       };
+
       dataChannel.onmessage = ({ data }) => {
         try {
           const msg = typeof data === "string" ? JSON.parse(data) : null;
-          if (msg?.type === "transfer-complete") {
+          if (msg?.type === "transfer-decision") {
+            if (transferDecisionResolve) {
+              transferDecisionResolve(msg.accepted);
+              transferDecisionResolve = null;
+            }
+          } else if (msg?.type === "transfer-complete") {
             if (transferAckResolve) {
               transferAckResolve();
               transferAckResolve = null;
@@ -745,18 +910,15 @@
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      // Explicitly extract type+sdp — spread loses prototype getters in some browsers
       sendSignal(roomId, { type: pc.localDescription.type, sdp: pc.localDescription.sdp });
     }
 
-    // Buffer candidates that arrive before setRemoteDescription (answer)
     let pendingCandidates = [];
 
     async function handleSignal(data, roomId) {
       if (!pc) return;
       if (data.type === "answer") {
         await pc.setRemoteDescription(new RTCSessionDescription({ type: data.type, sdp: data.sdp }));
-        // Flush buffered candidates
         for (const c of pendingCandidates) {
           try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch {}
         }
@@ -770,21 +932,67 @@
       }
     }
 
-    // ── Transfer ─────────────────────────────────────────────────────────────
-    async function beginTransfer() {
-      const file = selectedFile;
-      sentBytes = 0;
+    // ── Initiation & Transfer Loop ───────────────────────────────────────────
+    async function initiateHandshake() {
       transferCompleted = false;
 
-      // Fix: Android Chrome sometimes gives file.name as a full temp path
-      // e.g. "17908486080...693.jpg" — extract only the basename
-      const safeName = file.name.replace(/.*[/\\]/, "") || file.name;
+      // Prepare request payload
+      let req = {};
+      if (currentMode === "text") {
+        req = {
+          type: "transfer-request",
+          mode: "text",
+          text: textPayload,
+          totalSize: new TextEncoder().encode(textPayload).length
+        };
+      } else {
+        const totalBytes = selectedFiles.reduce((acc, f) => acc + f.size, 0);
+        req = {
+          type: "transfer-request",
+          mode: "file",
+          totalSize: totalBytes,
+          files: selectedFiles.map((f, i) => ({
+            id: i,
+            name: f.name.replace(/.*[/\\]/, "") || f.name,
+            size: f.size,
+            mimeType: f.type || "application/octet-stream"
+          }))
+        };
+      }
 
-      dataChannel.send(JSON.stringify({
-        name:     safeName,
-        size:     file.size,
-        mimeType: file.type || "application/octet-stream",
-      }));
+      dataChannel.send(JSON.stringify(req));
+
+      // Wait for receiver to Accept or Decline
+      const accepted = await new Promise(res => {
+        transferDecisionResolve = res;
+      });
+
+      if (!accepted) {
+        showError("Receiver declined the transfer.");
+        teardown();
+        showPhase("select");
+        return;
+      }
+
+      // If accepted:
+      if (currentMode === "text") {
+        // Text is already delivered in the request! Wait for ACK
+        await waitForReceiverAck();
+        transferCompleted = true;
+        document.getElementById("done-title").textContent = "Text Delivered!";
+        document.getElementById("done-meta").textContent = `${textPayload.length} characters sent successfully.`;
+        showPhase("done");
+      } else {
+        // Send files sequentially
+        showPhase("transfer");
+        await sendFilesSequentially();
+      }
+    }
+
+    async function sendFilesSequentially() {
+      const totalBytes = selectedFiles.reduce((acc, f) => acc + f.size, 0);
+      sentBytes = 0;
+      speedCalc._samples = [];
 
       const readChunk = blob => new Promise((res, rej) => {
         const r = new FileReader();
@@ -802,24 +1010,51 @@
         dataChannel.addEventListener("bufferedamountlow", onLow);
       });
 
-      let offset = 0;
-      while (offset < file.size) {
-        if (dataChannel.bufferedAmount > BP_HIGH) await waitDrain();
-        if (dataChannel.readyState !== "open") { showError("Connection lost."); return; }
-        const buf = await readChunk(file.slice(offset, offset + CHUNK_SIZE));
-        dataChannel.send(buf);
-        offset    += buf.byteLength;
-        sentBytes += buf.byteLength;
-        speedCalc.record(buf.byteLength);
-        const pct = sentBytes / file.size * 100;
-        document.getElementById("progress-bar").style.width  = Math.min(99.9, pct) + "%";
-        document.getElementById("progress-label").textContent = pct.toFixed(1) + "%";
-        document.getElementById("speed-label").textContent    = speedCalc.getFormatted();
-        document.getElementById("sent-label").textContent     = `${formatBytes(sentBytes)} / ${formatBytes(file.size)}`;
-        if ((offset / CHUNK_SIZE) % 8 === 0) await new Promise(r => setTimeout(r, 0));
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const safeName = file.name.replace(/.*[/\\]/, "") || file.name;
+
+        // UI update
+        const countTxt = selectedFiles.length > 1 ? `[${i + 1}/${selectedFiles.length}] ` : "";
+        document.getElementById("sending-name").textContent = countTxt + safeName;
+        document.getElementById("sending-meta").textContent = `${formatBytes(file.size)} · ${file.type || "file"}`;
+        document.getElementById("status-transfer").textContent = `Sending ${i + 1} of ${selectedFiles.length}…`;
+
+        // Send file-start header
+        dataChannel.send(JSON.stringify({
+          type: "file-start",
+          id: i,
+          name: safeName,
+          size: file.size,
+          mimeType: file.type || "application/octet-stream"
+        }));
+
+        let offset = 0;
+        while (offset < file.size) {
+          if (dataChannel.bufferedAmount > BP_HIGH) await waitDrain();
+          if (dataChannel.readyState !== "open") { showError("Connection lost."); return; }
+
+          const buf = await readChunk(file.slice(offset, offset + CHUNK_SIZE));
+          dataChannel.send(buf);
+
+          offset    += buf.byteLength;
+          sentBytes += buf.byteLength;
+          speedCalc.record(buf.byteLength);
+
+          const pct = (sentBytes / totalBytes) * 100;
+          document.getElementById("progress-bar").style.width   = Math.min(99.9, pct) + "%";
+          document.getElementById("progress-label").textContent  = pct.toFixed(1) + "%";
+          document.getElementById("speed-label").textContent     = speedCalc.getFormatted();
+          document.getElementById("sent-label").textContent      = `${formatBytes(sentBytes)} / ${formatBytes(totalBytes)}`;
+
+          if ((offset / CHUNK_SIZE) % 8 === 0) await new Promise(r => setTimeout(r, 0));
+        }
+
+        // Send file-end signal
+        dataChannel.send(JSON.stringify({ type: "file-end", id: i }));
       }
 
-      // Wait for the DataChannel send buffer to fully drain to network layer
+      // Wait for WebRTC send buffer to fully drain
       await new Promise(res => {
         const check = () => {
           if (!dataChannel || dataChannel.bufferedAmount === 0) return res();
@@ -828,24 +1063,28 @@
         check();
       });
 
-      // Indicate to sender that data is flushed and awaiting receiver confirmation
       document.getElementById("speed-label").textContent = "Finalizing…";
-
-      // Await confirmation ACK from receiver with a 45s fallback timeout
-      await new Promise(res => {
-        transferAckResolve = res;
-        setTimeout(() => {
-          console.warn("[Sender] Receiver ACK wait timed out after 45s, completing");
-          res();
-        }, 45000);
-      });
+      await waitForReceiverAck();
 
       transferCompleted = true;
       document.getElementById("progress-bar").style.width = "100%";
       document.getElementById("progress-label").textContent = "100%";
       document.getElementById("progress-bar").classList.add("done");
-      document.getElementById("done-meta").textContent = `${safeName} · ${formatBytes(file.size)} sent`;
+
+      const count = selectedFiles.length;
+      document.getElementById("done-title").textContent = count === 1 ? "File Sent!" : `${count} Files Sent!`;
+      document.getElementById("done-meta").textContent = `${formatBytes(totalBytes)} sent successfully.`;
       showPhase("done");
+    }
+
+    function waitForReceiverAck() {
+      return new Promise(res => {
+        transferAckResolve = res;
+        setTimeout(() => {
+          console.warn("[Sender] Receiver ACK timed out, proceeding.");
+          res();
+        }, 45000);
+      });
     }
 
     function teardown() {
@@ -855,17 +1094,29 @@
       try { pc?.close(); } catch{}
       ws = null; pc = null; dataChannel = null;
       transferCompleted = false;
+      transferDecisionResolve = null;
       transferAckResolve = null;
     }
 
     // ── Events ───────────────────────────────────────────────────────────────
-    document.getElementById("btn-send").addEventListener("click", async () => {
-      if (!selectedFile) return;
+    btnSend.addEventListener("click", async () => {
+      if (currentMode === "file" && selectedFiles.length === 0) return;
+      if (currentMode === "text" && textPayload.trim().length === 0) return;
       showPhase("listening");
       await startListening();
     });
+
     document.getElementById("btn-cancel-listen").addEventListener("click", () => { teardown(); showPhase("select"); });
-    document.getElementById("btn-send-again").addEventListener("click", () => { teardown(); clearFile(); showPhase("select"); });
+    document.getElementById("btn-cancel-connect").addEventListener("click", () => { teardown(); showPhase("select"); });
+    document.getElementById("btn-send-again").addEventListener("click", () => {
+      teardown();
+      clearFiles();
+      textInput.value = "";
+      textPayload = "";
+      charCount.textContent = "0 chars";
+      urlDetector.style.display = "none";
+      showPhase("select");
+    });
   </script>
 </body>
 </html>
