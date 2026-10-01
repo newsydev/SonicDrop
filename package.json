@@ -1,0 +1,18 @@
+{
+  "name": "sonicdrop",
+  "version": "1.0.0",
+  "description": "Zero-click, zero-pairing file transfer via near-ultrasound acoustic handshaking + WebRTC DataChannels",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["webrtc", "ggwave", "ultrasound", "file-transfer", "p2p"],
+  "license": "MIT"
+}

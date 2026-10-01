@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SonicDrop — Receive</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet" />
+
+  <!-- ggwave (served locally — WASM is base64-embedded, no external fetch needed) -->
+  <script src="/ggwave.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #07071a;
+      --surface:   #0f0f2e;
+      --border:    rgba(120,119,255,0.18);
+      --brand:     #7c7fff;
+      --brand-dim: rgba(124,127,255,0.12);
+      --text:      #e8e8f4;
+      --muted:     #6b6b8a;
+      --success:   #34d399;
+      --warn:      #fbbf24;
+      --danger:    #f87171;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* ── Background ── */
+    .bg-noise {
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 20% -10%, rgba(124,127,255,0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 110%, rgba(168,85,247,0.12) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* ── Layout ── */
+    .container { position: relative; z-index: 1; width: 100%; max-width: 440px; }
+
+    /* ── Logo / Header ── */
+    .header { text-align: center; margin-bottom: 2rem; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 99px;
+      background: var(--brand-dim); border: 1px solid var(--border);
+      font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--brand);
+      margin-bottom: 1rem;
+    }
+    .badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--brand);
+      animation: blink 2s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .logo {
+      font-size: 2.6rem; font-weight: 900; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #a5b4fc 0%, #818cf8 40%, #c084fc 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle { font-size: 0.875rem; color: var(--muted); font-weight: 400; }
+
+    /* ── Card ── */
+    .card {
+      background: rgba(15, 15, 46, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2rem;
+      backdrop-filter: blur(32px);
+      -webkit-backdrop-filter: blur(32px);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.3), 0 32px 64px rgba(0,0,0,0.4);
+    }
+
+    /* ── Phases ── */
+    .phase { display: none; }
+    .phase.active { display: block; animation: fadeUp 0.35s ease forwards; }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(10px); }
+      to   { opacity:1; transform:translateY(0);    }
+    }
+
+    /* ── Icon circles ── */
+    .icon-wrap {
+      width: 72px; height: 72px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.25rem;
+      position: relative;
+    }
+    .icon-wrap svg { width: 32px; height: 32px; }
+    .icon-brand  { background: var(--brand-dim); border: 1px solid rgba(124,127,255,0.3); color: var(--brand); }
+    .icon-warn   { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); color: var(--warn); }
+    .icon-success{ background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: var(--success); }
+
+    /* Sonar rings on start icon */
+    .sonar-ring {
+      position: absolute; border-radius: 50%;
+      border: 1.5px solid var(--brand);
+      animation: sonar 2.8s ease-out infinite;
+      opacity: 0;
+    }
+    .sonar-ring:nth-child(1) { width: 72px;  height: 72px;  animation-delay: 0s;   }
+    .sonar-ring:nth-child(2) { width: 100px; height: 100px; animation-delay: 0.7s; }
+    .sonar-ring:nth-child(3) { width: 128px; height: 128px; animation-delay: 1.4s; }
+    @keyframes sonar {
+      0%   { opacity: 0.7; transform: scale(0.7); }
+      100% { opacity: 0;   transform: scale(1);   }
+    }
+
+    /* Spin for connecting */
+    .spin { animation: spinAnim 1.4s linear infinite; }
+    @keyframes spinAnim { to { transform: rotate(360deg); } }
+
+    /* ── Typography ── */
+    .phase-title  { font-size: 1.2rem; font-weight: 700; text-align: center; margin-bottom: 0.4rem; }
+    .phase-body   { font-size: 0.875rem; color: var(--muted); text-align: center; line-height: 1.6; margin-bottom: 1.5rem; }
+    .phase-body a { color: var(--brand); text-decoration: none; }
+    .phase-body a:hover { text-decoration: underline; }
+
+    /* ── Room ID Boxes ── */
+    .room-id-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 1.5rem; }
+    .room-char {
+      font-family: 'JetBrains Mono', monospace;
+      width: 52px; height: 60px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; font-weight: 700;
+      background: rgba(124,127,255,0.1);
+      border: 1.5px solid rgba(124,127,255,0.35);
+      border-radius: 10px;
+      color: #a5b4fc;
+      letter-spacing: 0;
+      box-shadow: 0 0 16px rgba(124,127,255,0.15) inset;
+      text-shadow: 0 0 12px rgba(124,127,255,0.5);
+      animation: charPop 0.3s ease backwards;
+    }
+    .room-char:nth-child(1){animation-delay:.05s}
+    .room-char:nth-child(2){animation-delay:.1s}
+    .room-char:nth-child(3){animation-delay:.15s}
+    .room-char:nth-child(4){animation-delay:.2s}
+    @keyframes charPop {
+      from { opacity:0; transform:scale(0.7) translateY(6px); }
+      to   { opacity:1; transform:scale(1)   translateY(0);   }
+    }
+
+    /* ── Waveform bars (beacon) ── */
+    .wave-row { display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 36px; margin-bottom: 1rem; }
+    .wave-bar {
+      width: 4px; border-radius: 2px;
+      background: var(--brand);
+      opacity: 0.8;
+      animation: waveBounce 0.8s ease-in-out infinite alternate;
+    }
+    .wave-bar:nth-child(1){height:30%;animation-delay:0s}
+    .wave-bar:nth-child(2){height:55%;animation-delay:.07s}
+    .wave-bar:nth-child(3){height:80%;animation-delay:.14s}
+    .wave-bar:nth-child(4){height:100%;animation-delay:.21s}
+    .wave-bar:nth-child(5){height:80%;animation-delay:.28s}
+    .wave-bar:nth-child(6){height:55%;animation-delay:.35s}
+    .wave-bar:nth-child(7){height:30%;animation-delay:.42s}
+    @keyframes waveBounce {
+      from { transform: scaleY(0.4); }
+      to   { transform: scaleY(1);   }
+    }
+
+    /* ── Status chip ── */
+    .status-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 99px;
+      font-size: 0.78rem; font-weight: 600;
+      margin-bottom: 1.25rem;
+    }
+    .chip-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .chip-blue  { background: rgba(96,165,250,0.12); border:1px solid rgba(96,165,250,0.25); color:#93c5fd; }
+    .chip-amber { background: rgba(251,191,36,0.1);  border:1px solid rgba(251,191,36,0.25); color:#fcd34d; }
+    .chip-green { background: rgba(52,211,153,0.1);  border:1px solid rgba(52,211,153,0.25); color:#6ee7b7; }
+
+    /* ── Hint box ── */
+    .hint-box {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 0.875rem 1rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 1.25rem;
+    }
+    .hint-box strong { color: var(--text); }
+    .hint-box code { color: var(--brand); background: var(--brand-dim); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 0.85em; }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%; padding: 0.875rem 1.25rem;
+      border: none; border-radius: 12px;
+      font-family: inherit; font-size: 0.95rem; font-weight: 600;
+      cursor: pointer; transition: all 0.18s ease;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.35), 0 1px 0 rgba(255,255,255,0.08) inset;
+    }
+    .btn-primary:hover { box-shadow: 0 6px 28px rgba(99,102,241,0.5), 0 1px 0 rgba(255,255,255,0.1) inset; filter: brightness(1.06); }
+    .btn-ghost {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted);
+      margin-top: 0.625rem;
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.07); color: var(--text); border-color: rgba(255,255,255,0.14); }
+
+    /* ── Progress ── */
+    .file-info-row {
+      display: flex; align-items: center; gap: 12px;
+      background: rgba(124,127,255,0.07);
+      border: 1px solid rgba(124,127,255,0.15);
+      border-radius: 12px; padding: 0.875rem;
+      margin-bottom: 1.25rem;
+    }
+    .file-icon {
+      width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+      background: var(--brand-dim); border: 1px solid rgba(124,127,255,0.25);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--brand);
+    }
+    .file-icon svg { width: 20px; height: 20px; }
+    .file-name { font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-meta { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+    .progress-track {
+      height: 6px; background: rgba(255,255,255,0.06);
+      border-radius: 99px; overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, #6366f1, #a78bfa, #6366f1);
+      background-size: 200% 100%;
+      animation: shimmer 1.8s linear infinite;
+      transition: width 0.25s ease;
+    }
+    @keyframes shimmer { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
+    .progress-fill.done { animation: none; background: var(--success); }
+
+    .stats-row {
+      display: flex; justify-content: space-between;
+      font-size: 0.75rem; color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .stats-row span:first-child { color: var(--brand); font-weight: 600; }
+
+    /* ── Error ── */
+    .error-bar {
+      display: none; align-items: flex-start; gap: 8px;
+      background: rgba(248,113,113,0.08);
+      border: 1px solid rgba(248,113,113,0.25);
+      border-radius: 10px; padding: 0.75rem;
+      margin-top: 1rem;
+      font-size: 0.825rem; color: #fca5a5;
+    }
+    .error-bar.visible { display: flex; }
+    .error-bar svg { width:16px; height:16px; flex-shrink:0; margin-top:1px; }
+
+    /* ── Done success ring ── */
+    .ping-ring {
+      position: absolute; inset: 0; border-radius: 50%;
+      background: rgba(52,211,153,0.2);
+      animation: pingRing 1.5s ease-out infinite;
+    }
+    @keyframes pingRing {
+      0%   { transform:scale(0.9); opacity:0.8; }
+      100% { transform:scale(1.6); opacity:0;   }
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center; margin-top: 1.5rem;
+      font-size: 0.75rem; color: #3a3a55;
+    }
+    .footer a { color: var(--brand); opacity: 0.5; text-decoration: none; }
+    .footer a:hover { opacity: 1; }
+  </style>
+</head>
+
+<body>
+  <div class="bg-noise" aria-hidden="true"></div>
+
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="badge">
+        <span class="badge-dot"></span>
+        Receiver Mode
+      </div>
+      <div class="logo">SonicDrop</div>
+      <p class="subtitle">Near-ultrasound acoustic file transfer &middot; Zero pairing</p>
+    </div>
+
+    <!-- Card -->
+    <div class="card">
+
+      <!-- ══ Phase: Start ══ -->
+      <div id="phase-start" class="phase active" style="text-align:center">
+        <div class="icon-wrap icon-brand" style="width:80px;height:80px;margin-bottom:2rem">
+          <div class="sonar-ring"></div>
+          <div class="sonar-ring"></div>
+          <div class="sonar-ring"></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"/>
+          </svg>
+        </div>
+        <p class="phase-title">Ready to Receive</p>
+        <p class="phase-body">
+          Click below to broadcast an invisible ultrasonic beacon.<br/>
+          Open <a href="/sender">SonicDrop Sender</a> on your phone, pick a file, and it'll connect automatically — no QR code, no PIN.
+        </p>
+        <button id="btn-start" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"/>
+          </svg>
+          Start Receiving
+        </button>
+      </div>
+
+      <!-- ══ Phase: Beacon ══ -->
+      <div id="phase-beacon" class="phase" style="text-align:center">
+        <p style="font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:0.75rem">Ultrasonic Room ID</p>
+        <div class="room-id-row" id="room-id-display"></div>
+
+        <div class="wave-row">
+          <div class="wave-bar"></div><div class="wave-bar"></div>
+          <div class="wave-bar"></div><div class="wave-bar"></div>
+          <div class="wave-bar"></div><div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+        </div>
+
+        <div class="status-chip chip-blue" style="margin:0 auto 1.25rem">
+          <span class="chip-dot" style="background:#93c5fd;animation:blink 1.5s infinite"></span>
+          <span id="status-text">Broadcasting ultrasonic beacon…</span>
+        </div>
+
+        <div class="hint-box">
+          <strong>📱 On your mobile:</strong> Open <code>/sender</code> on the same network, select a file, tap <strong>Send File</strong>. The acoustic handshake is automatic.
+        </div>
+
+        <button id="btn-cancel" class="btn btn-ghost">Cancel</button>
+      </div>
+
+      <!-- ══ Phase: Connecting ══ -->
+      <div id="phase-connecting" class="phase" style="text-align:center">
+        <div class="icon-wrap icon-warn">
+          <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+          </svg>
+        </div>
+        <p class="phase-title">Handshake Complete ✓</p>
+        <p class="phase-body" style="margin-bottom:0.75rem">Sender decoded the beacon successfully</p>
+        <div class="status-chip chip-amber" style="margin:0 auto">
+          <span class="chip-dot" style="background:var(--warn);animation:blink 1s infinite"></span>
+          <span id="status-text-connect">Establishing WebRTC connection…</span>
+        </div>
+      </div>
+
+      <!-- ══ Phase: Transfer ══ -->
+      <div id="phase-transfer" class="phase">
+        <div class="file-info-row">
+          <div class="file-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+            </svg>
+          </div>
+          <div style="min-width:0">
+            <div class="file-name" id="file-name-display">…</div>
+            <div class="file-meta" id="file-meta-display">…</div>
+          </div>
+        </div>
+
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-bar" style="width:0%"></div>
+        </div>
+        <div class="stats-row">
+          <span id="progress-label">0%</span>
+          <span id="speed-label">—</span>
+          <span id="received-label">0 / 0</span>
+        </div>
+
+        <div class="status-chip chip-blue" style="margin:0 auto">
+          <span class="chip-dot" style="background:#93c5fd;animation:blink 1s infinite"></span>
+          <span id="status-text-transfer">Receiving…</span>
+        </div>
+      </div>
+
+      <!-- ══ Phase: Done ══ -->
+      <div id="phase-done" class="phase" style="text-align:center">
+        <div class="icon-wrap icon-success" style="width:80px;height:80px;margin-bottom:1.5rem">
+          <div class="ping-ring"></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.5 12.75l6 6 9-13.5"/>
+          </svg>
+        </div>
+        <p class="phase-title">Transfer Complete!</p>
+        <p class="phase-body" id="done-meta">File saved successfully.</p>
+        <button id="btn-receive-again" class="btn btn-primary">Receive Another File</button>
+      </div>
+
+      <!-- Error banner -->
+      <div class="error-bar" id="error-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span id="error-text">An error occurred.</span>
+      </div>
+
+    </div><!-- /card -->
+
+    <div class="footer">
+      SonicDrop &nbsp;·&nbsp; 18.5–20 kHz acoustic &nbsp;·&nbsp;
+      <a href="/sender">Open Sender →</a>
+    </div>
+
+  </div><!-- /container -->
+
+  <script type="module">
+    import {
+      generateRoomId, createSignalingSocket, RTC_CONFIG,
+      formatBytes, SpeedCalculator
+    } from "/utils.js";
+
+    // ── Phase management ─────────────────────────────────────────────────────
+    const phases = ["start","beacon","connecting","transfer","done"];
+    function showPhase(name) {
+      phases.forEach(p => {
+        document.getElementById("phase-" + p).classList.toggle("active", p === name);
+      });
+      document.getElementById("error-banner").classList.remove("visible");
+    }
+    function showError(msg) {
+      document.getElementById("error-text").textContent = msg;
+      document.getElementById("error-banner").classList.add("visible");
+      console.error("[Receiver]", msg);
+    }
+    function setConnectStatus(msg) {
+      const el = document.getElementById("status-text-connect");
+      if (el) el.textContent = msg;
+    }
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let audioCtx=null, gainNode=null, beaconSource=null, beaconTimer=null;
+    let ggwaveInstance=null, ws=null, pc=null, roomId=null;
+    let fileChunks=[], fileMeta=null, receivedBytes=0;
+    let pendingCandidates = [];   // buffer candidates before remoteDescription
+    const speedCalc = new SpeedCalculator();
+
+    // ── Room ID render ───────────────────────────────────────────────────────
+    function renderRoomId(id) {
+      const c = document.getElementById("room-id-display");
+      c.innerHTML = id.split("").map(ch => `<div class="room-char">${ch}</div>`).join("");
+    }
+
+    // ── ggwave init ──────────────────────────────────────────────────────────
+    async function initGgwave() {
+      if (ggwaveInstance) return ggwaveInstance;
+      await new Promise((resolve, reject) => {
+        let tries = 0;
+        const check = () => {
+          if (typeof ggwave_factory !== "undefined") return resolve();
+          if (++tries > 100) return reject(new Error("ggwave_factory timed out — check /ggwave.js loaded"));
+          setTimeout(check, 100);
+        };
+        check();
+      });
+      const instance = await ggwave_factory();
+      ggwaveInstance = instance;
+      return ggwaveInstance;
+    }
+
+    // ── Beacon ───────────────────────────────────────────────────────────────
+    async function startBeacon(id) {
+      const gw = await initGgwave();
+      audioCtx = new AudioContext({ sampleRate: 48000 });
+      gainNode = audioCtx.createGain();
+      gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gainNode.connect(audioCtx.destination);
+
+      // ── Create TX instance ONCE and reuse ────────────────────────────────
+      // Bugs fixed vs original:
+      //   1. samplesPerFrame must be ≤ 1024 (v0.4.0 hard limit; 2048 → Aborted)
+      //   2. Use gw.ProtocolId enum object, NOT raw integer 9
+      //      (raw 9 = GGWAVE_PROTOCOL_DT_FASTEST, not ultrasound)
+      //   3. GGWAVE_OPERATING_MODE_USE_DSS is for RX only; TX only needs TX flag
+      //   4. init() inside playOnce() leaked instances (max=4); create once here
+      const txParams = gw.getDefaultParameters();
+      txParams.sampleRate      = 48000;
+      txParams.samplesPerFrame = 1024;   // max allowed in v0.4.0
+      txParams.operatingMode   = gw.GGWAVE_OPERATING_MODE_TX;
+      const txInst = gw.init(txParams);
+
+      // Pre-encode the beacon PCM buffer once — Room ID never changes
+      const pcmRaw = gw.encode(
+        txInst,
+        id,
+        gw.ProtocolId.GGWAVE_PROTOCOL_ULTRASOUND_FASTEST, // enum object, not int
+        10  // volume (0–100)
+      );
+      gw.free(txInst); // done with encoder instance
+
+      if (!pcmRaw?.length) {
+        console.error("[Beacon] encode returned empty buffer");
+        return;
+      }
+
+      // Convert Int16 PCM → Float32 once; reuse the same AudioBuffer every tick
+      const f32 = new Float32Array(pcmRaw.length);
+      for (let i = 0; i < pcmRaw.length; i++) f32[i] = pcmRaw[i] / 32768;
+      const audioBuf = audioCtx.createBuffer(1, f32.length, 48000);
+      audioBuf.copyToChannel(f32, 0);
+
+      function playOnce() {
+        try {
+          beaconSource = audioCtx.createBufferSource();
+          beaconSource.buffer = audioBuf;
+          beaconSource.connect(gainNode);
+          beaconSource.start();
+        } catch(e) { console.warn("[Beacon]", e); }
+      }
+      playOnce();
+      beaconTimer = setInterval(playOnce, 2000);
+    }
+
+    function stopBeacon() {
+      clearInterval(beaconTimer); beaconTimer = null;
+      try { beaconSource?.stop(); } catch{}
+      try { gainNode?.disconnect(); } catch{}
+      try { audioCtx?.suspend(); } catch{}
+    }
+
+
+    // ── Pre-warm WebRTC ──────────────────────────────────────────────────────
+    // Create RTCPeerConnection immediately when WS opens — ICE gathering
+    // starts right away with iceCandidatePoolSize:10, so by the time the
+    // sender connects and we need to answer the offer, candidates are ready.
+    function preWarmWebRTC() {
+      if (pc) return;
+      pc = new RTCPeerConnection(RTC_CONFIG);
+
+      pc.onicecandidate = ({ candidate }) => {
+        if (candidate) sendSignal({ type: "ice-candidate", candidate });
+      };
+
+      // Detailed connection state for the UI
+      pc.oniceconnectionstatechange = () => {
+        const s = pc.iceConnectionState;
+        console.log("[ICE]", s);
+        const labels = {
+          "checking":   "Checking ICE candidates…",
+          "connected":  "ICE connected ✓  Finalizing…",
+          "completed":  "ICE complete ✓",
+          "failed":     "ICE failed — retrying…",
+          "disconnected": "ICE disconnected…",
+        };
+        if (labels[s]) setConnectStatus(labels[s]);
+        if (s === "failed") pc.restartIce(); // automatic ICE restart
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log("[WebRTC]", pc.connectionState);
+        if (pc.connectionState === "failed") showError("WebRTC connection failed.");
+      };
+
+      pc.ondatachannel = ({ channel }) => setupDataChannel(channel);
+      console.log("[WebRTC] Pre-warmed — ICE gathering started");
+    }
+
+    // ── Signaling ────────────────────────────────────────────────────────────
+    function connectSignaling() {
+      ws = createSignalingSocket();
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: "create-room", roomId }));
+        // 🔑 Pre-warm immediately — ICE candidates start gathering NOW,
+        // while the beacon is still transmitting and before sender joins.
+        preWarmWebRTC();
+      };
+
+      ws.onmessage = async (e) => {
+        const msg = JSON.parse(e.data);
+        switch (msg.type) {
+          case "room-created":
+            console.log("[Signal] Room ready:", msg.roomId);
+            break;
+          case "peer-joined":
+            stopBeacon();
+            showPhase("connecting");
+            setConnectStatus("Sender connected — exchanging ICE candidates…");
+            break;
+          case "signal":
+            await handleSignal(msg.data);
+            break;
+          case "peer-left":
+            showError("Sender disconnected."); teardown(); break;
+          case "error":
+            showError("Server: " + msg.message); break;
+        }
+      };
+      ws.onerror = () => showError("WebSocket failed. Is the server running?");
+    }
+
+    function sendSignal(data) {
+      if (ws?.readyState === WebSocket.OPEN)
+        ws.send(JSON.stringify({ type: "signal", roomId, data }));
+    }
+
+    // ── Handle incoming signals ───────────────────────────────────────────────
+    async function handleSignal(data) {
+      if (!pc) return;
+
+      if (data.type === "offer") {
+        setConnectStatus("Processing offer — creating answer…");
+        await pc.setRemoteDescription(new RTCSessionDescription({ type: data.type, sdp: data.sdp }));
+
+        // Flush any candidates that arrived before remoteDescription was set
+        for (const c of pendingCandidates) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch{}
+        }
+        pendingCandidates = [];
+
+        const ans = await pc.createAnswer();
+        await pc.setLocalDescription(ans);
+        // Explicitly pass type+sdp — RTCSessionDescription prototype getters
+        // don't survive object spread ({...pc.localDescription}) in all browsers,
+        // resulting in an empty SDP that fails setRemoteDescription on the sender.
+        sendSignal({ type: pc.localDescription.type, sdp: pc.localDescription.sdp });
+
+      } else if (data.type === "ice-candidate" && data.candidate) {
+        if (pc.remoteDescription) {
+          // Remote description is set — add immediately
+          try { await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch{}
+        } else {
+          // Arrived before offer — buffer it
+          pendingCandidates.push(data.candidate);
+        }
+      }
+    }
+
+    // ── DataChannel ──────────────────────────────────────────────────────────
+    function setupDataChannel(ch) {
+      ch.binaryType = "arraybuffer";
+      ch.onopen = () => showPhase("transfer");
+      ch.onmessage = ({ data }) => {
+        if (typeof data === "string") {
+          fileMeta = JSON.parse(data);
+          document.getElementById("file-name-display").textContent = fileMeta.name;
+          document.getElementById("file-meta-display").textContent =
+            `${formatBytes(fileMeta.size)} · ${fileMeta.mimeType || "unknown"}`;
+          receivedBytes = 0; fileChunks = [];
+        } else {
+          fileChunks.push(data);
+          receivedBytes += data.byteLength;
+          speedCalc.record(data.byteLength);
+          const pct = fileMeta ? receivedBytes / fileMeta.size * 100 : 0;
+          document.getElementById("progress-bar").style.width = Math.min(100, pct) + "%";
+          document.getElementById("progress-label").textContent = pct.toFixed(1) + "%";
+          document.getElementById("speed-label").textContent = speedCalc.getFormatted();
+          document.getElementById("received-label").textContent =
+            `${formatBytes(receivedBytes)} / ${formatBytes(fileMeta?.size ?? 0)}`;
+          if (fileMeta && receivedBytes >= fileMeta.size) finishTransfer();
+        }
+      };
+    }
+
+    function finishTransfer() {
+      document.getElementById("progress-bar").classList.add("done");
+      const blob = new Blob(fileChunks, { type: fileMeta?.mimeType || "application/octet-stream" });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement("a"), { href: url, download: fileMeta?.name || "file" });
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      document.getElementById("done-meta").textContent =
+        `${fileMeta?.name} · ${formatBytes(fileMeta?.size ?? 0)} received`;
+      showPhase("done");
+      ws?.close(); pc?.close();
+    }
+
+    function teardown() {
+      stopBeacon(); ws?.close(); pc?.close(); pc = null; ws = null; pendingCandidates = [];
+    }
+
+    // ── Events ───────────────────────────────────────────────────────────────
+    document.getElementById("btn-start").addEventListener("click", async () => {
+      try {
+        roomId = generateRoomId();
+        renderRoomId(roomId);
+        showPhase("beacon");
+        connectSignaling();        // pre-warms WebRTC inside ws.onopen
+        await startBeacon(roomId);
+      } catch(e) { showPhase("start"); showError("Failed to start: " + e.message); }
+    });
+    document.getElementById("btn-cancel").addEventListener("click", () => { teardown(); showPhase("start"); });
+    document.getElementById("btn-receive-again").addEventListener("click", () => {
+      fileChunks = []; fileMeta = null; receivedBytes = 0; showPhase("start");
+    });
+  </script>
+</body>
+</html>
