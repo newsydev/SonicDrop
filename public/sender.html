@@ -18,8 +18,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet" />
 
-  <!-- ggwave (served locally) -->
+  <!-- ggwave & SimpleWebAuthn (served locally) -->
   <script src="/ggwave.js"></script>
+  <script src="/simplewebauthn-browser.min.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -330,6 +331,71 @@
     .error-bar.visible { display: flex; }
     .error-bar svg { width: 16px; height: 16px; flex-shrink: 0; }
 
+    /* ── Biometric Lock UI ── */
+    .lock-shield-wrap {
+      width: 76px; height: 76px;
+      margin: 0.5rem auto 1.25rem;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(139,92,246,0.22) 0%, rgba(139,92,246,0.04) 70%);
+      border: 1px solid rgba(139,92,246,0.38);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 28px rgba(139,92,246,0.25);
+      transition: all 0.3s ease;
+      color: #c4b5fd;
+    }
+    .lock-shield-wrap.authenticating {
+      animation: lockPulse 1.4s ease-in-out infinite alternate;
+      border-color: #a78bfa;
+      color: #fff;
+    }
+    .lock-shield-wrap.unlocked {
+      background: radial-gradient(circle, rgba(52,211,153,0.25) 0%, rgba(52,211,153,0.05) 70%);
+      border-color: rgba(52,211,153,0.5);
+      box-shadow: 0 0 28px rgba(52,211,153,0.3);
+      color: var(--success);
+    }
+    .lock-shield-wrap.failed {
+      background: radial-gradient(circle, rgba(248,113,113,0.25) 0%, rgba(248,113,113,0.05) 70%);
+      border-color: rgba(248,113,113,0.5);
+      box-shadow: 0 0 28px rgba(248,113,113,0.3);
+      color: var(--danger);
+      animation: lockShake 0.4s ease;
+    }
+    @keyframes lockPulse {
+      from { box-shadow: 0 0 0 0 rgba(139,92,246,0.4); transform: scale(1); }
+      to   { box-shadow: 0 0 0 16px rgba(139,92,246,0); transform: scale(1.04); }
+    }
+    @keyframes lockShake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+    .lock-privacy-note {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 14px;
+      background: rgba(139,92,246,0.06);
+      border: 1px solid rgba(139,92,246,0.2);
+      border-radius: 12px;
+      font-size: 0.78rem; line-height: 1.45;
+      color: #c4b5fd; text-align: left;
+      margin-bottom: 1.25rem;
+    }
+    .lock-badge-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 99px;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      cursor: pointer; transition: all 0.2s;
+    }
+    .lock-badge-btn:hover, .lock-badge-btn:focus-visible {
+      background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3); color: #fca5a5;
+      outline: none;
+    }
+    button:focus-visible, [tabindex="0"]:focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 2px;
+    }
+
     /* ── Footer ── */
     .footer { text-align: center; margin-top: 1.5rem; font-size: 0.75rem; color: var(--muted); }
     .footer a { color: var(--brand); text-decoration: none; }
@@ -343,9 +409,15 @@
 
     <!-- Header -->
     <div class="header">
-      <div class="badge">
-        <span class="badge-dot"></span>
-        Sender Mode
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:0.75rem">
+        <div class="badge" style="margin-bottom:0">
+          <span class="badge-dot"></span>
+          Sender Mode
+        </div>
+        <button id="btn-manual-lock" class="lock-badge-btn" title="Lock SonicDrop" type="button" style="display:none" aria-label="Lock SonicDrop">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Lock</span>
+        </button>
       </div>
       <h1 class="logo">SonicDrop</h1>
       <p class="subtitle">Acoustic zero-pairing · Instant local transfer</p>
@@ -354,8 +426,56 @@
     <!-- Main Card -->
     <div class="card">
 
+      <!-- ══ Phase: Biometric Lock ══ -->
+      <div id="phase-lock" class="phase active" style="text-align:center" role="region" aria-label="Biometric Security Lock">
+        <div class="lock-shield-wrap" id="lock-shield-wrap">
+          <div id="lock-shield-icon" style="display:flex;align-items:center;justify-content:center">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </div>
+        </div>
+
+        <p class="phase-title" id="lock-title">SonicDrop is Locked</p>
+        <p style="font-size:0.86rem;color:var(--muted);margin-bottom:1rem" id="lock-subtitle">Unlock to start using SonicDrop</p>
+
+        <!-- Privacy & Security Guarantee -->
+        <div class="lock-privacy-note" id="lock-privacy-note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="flex-shrink:0;margin-top:2px" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <span id="lock-privacy-text">
+            Your fingerprint stays securely on your device. SonicDrop only uses a secure passkey to verify that you are authorized to unlock the app.
+          </span>
+        </div>
+
+        <!-- Status Chip -->
+        <div class="status-chip chip-amber" id="lock-status-chip" style="margin:0 auto 1.25rem; display:none" role="status" aria-live="polite">
+          <span class="chip-dot" id="lock-chip-dot" style="background:var(--warn);animation:blink 1s infinite"></span>
+          <span id="lock-status-text">Waiting for verification…</span>
+        </div>
+
+        <!-- Primary Action Button -->
+        <button id="btn-biometric-action" class="btn btn-primary" type="button">
+          <svg id="btn-biometric-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.012 1.037-4.17 1.037-6.432A9 9 0 002.046 11c0 2.262.392 4.42 1.037 6.432"/>
+          </svg>
+          <span id="btn-biometric-label">Unlock with Biometrics</span>
+        </button>
+
+        <!-- Secondary Buttons -->
+        <button id="btn-biometric-cancel" class="btn btn-ghost" type="button" style="display:none">
+          Cancel
+        </button>
+
+        <button id="btn-biometric-fallback" class="btn btn-ghost" type="button" style="display:none">
+          Continue to SonicDrop
+        </button>
+      </div>
+
       <!-- ══ Phase: Select ══ -->
-      <div id="phase-select" class="phase active">
+      <div id="phase-select" class="phase">
 
         <!-- Tabs: Files vs Text -->
         <div class="tabs-row">
@@ -539,7 +659,7 @@
     } from "/utils.js";
 
     // ── Phase ────────────────────────────────────────────────────────────────
-    const phases = ["select", "listening", "connecting", "transfer", "done"];
+    const phases = ["lock", "select", "listening", "connecting", "transfer", "done"];
     function showPhase(name) {
       phases.forEach(p => {
         const el = document.getElementById("phase-" + p);
@@ -552,6 +672,294 @@
       document.getElementById("error-text").textContent = msg;
       document.getElementById("error-banner").classList.add("visible");
       console.error("[Sender]", msg);
+    }
+
+    // ── Biometric Application Lock State & Handlers ──────────────────────────
+    let appLockState = "LOCKED"; // "LOCKED" | "UNLOCKING" | "UNLOCKED"
+    let currentSessionToken = sessionStorage.getItem("sonicdrop_session_token") || null;
+    let deviceId = localStorage.getItem("sonicdrop_device_id");
+    if (!deviceId) {
+      deviceId = (typeof crypto !== "undefined" && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : ("dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36));
+      localStorage.setItem("sonicdrop_device_id", deviceId);
+    }
+    let isDeviceRegistered = false;
+    let biometricSupported = false;
+    let platformAuthName = "Biometrics";
+
+    // Lock elements
+    const lockShieldWrap    = document.getElementById("lock-shield-wrap");
+    const lockShieldIcon    = document.getElementById("lock-shield-icon");
+    const lockTitle         = document.getElementById("lock-title");
+    const lockSubtitle      = document.getElementById("lock-subtitle");
+    const lockPrivacyNote   = document.getElementById("lock-privacy-note");
+    const lockStatusChip    = document.getElementById("lock-status-chip");
+    const lockChipDot       = document.getElementById("lock-chip-dot");
+    const lockStatusText    = document.getElementById("lock-status-text");
+    const btnBioAction      = document.getElementById("btn-biometric-action");
+    const btnBioLabel       = document.getElementById("btn-biometric-label");
+    const btnBioCancel      = document.getElementById("btn-biometric-cancel");
+    const btnBioFallback    = document.getElementById("btn-biometric-fallback");
+    const btnManualLock     = document.getElementById("btn-manual-lock");
+
+    const ICON_LOCK = `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+    const ICON_UNLOCK = `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`;
+    const ICON_CHECK = `<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
+    const ICON_ALERT = `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+
+    function detectPlatformAuthName() {
+      const ua = navigator.userAgent || "";
+      if (/iPhone|iPad|iPod/i.test(ua)) return "Face ID / Touch ID";
+      if (/Mac OS/i.test(ua)) return "Touch ID";
+      if (/Android/i.test(ua)) return "Fingerprint";
+      if (/Windows/i.test(ua)) return "Windows Hello / Fingerprint";
+      return "Biometrics";
+    }
+
+    async function isBiometricSupported() {
+      if (!window.isSecureContext) {
+        return { supported: false, reason: "Insecure context. WebAuthn requires HTTPS or localhost." };
+      }
+      const swb = window.SimpleWebAuthnBrowser;
+      if (!swb || !swb.browserSupportsWebAuthn || !swb.browserSupportsWebAuthn()) {
+        return { supported: false, reason: "WebAuthn / Passkeys not supported by this browser." };
+      }
+      try {
+        const available = await swb.platformAuthenticatorIsAvailable();
+        if (!available) {
+          return { supported: false, reason: "No platform authenticator (fingerprint/face hardware) detected on this device." };
+        }
+        return { supported: true };
+      } catch (err) {
+        return { supported: false, reason: err.message || "Failed checking platform authenticator." };
+      }
+    }
+
+    function renderLockState(mode, opts = {}) {
+      lockShieldWrap.classList.remove("authenticating", "unlocked", "failed");
+      btnBioAction.disabled = false;
+      btnBioCancel.style.display = "none";
+      btnBioFallback.style.display = "none";
+      lockStatusChip.style.display = "none";
+
+      if (mode === "SETUP") {
+        lockShieldWrap.className = "lock-shield-wrap";
+        lockShieldIcon.innerHTML = ICON_LOCK;
+        lockTitle.textContent = "Set Up Biometric Unlock";
+        lockSubtitle.textContent = `Protect SonicDrop transfers with ${platformAuthName}`;
+        lockPrivacyNote.style.display = "flex";
+        btnBioAction.style.display = "flex";
+        btnBioLabel.textContent = `Enable ${platformAuthName}`;
+      } else if (mode === "LOCKED") {
+        lockShieldWrap.className = "lock-shield-wrap";
+        lockShieldIcon.innerHTML = ICON_LOCK;
+        lockTitle.textContent = "SonicDrop is Locked";
+        lockSubtitle.textContent = "Unlock to start using SonicDrop";
+        lockPrivacyNote.style.display = "flex";
+        btnBioAction.style.display = "flex";
+        btnBioLabel.textContent = `Unlock with ${platformAuthName}`;
+      } else if (mode === "UNLOCKING") {
+        lockShieldWrap.className = "lock-shield-wrap authenticating";
+        lockShieldIcon.innerHTML = ICON_UNLOCK;
+        lockTitle.textContent = "Verifying Identity…";
+        lockSubtitle.textContent = opts.subtitle || "Waiting for native biometric verification…";
+        lockStatusChip.style.display = "inline-flex";
+        lockChipDot.style.background = "var(--warn)";
+        lockStatusText.textContent = "Touch biometric sensor or glance at camera";
+        btnBioAction.disabled = true;
+        btnBioCancel.style.display = "block";
+      } else if (mode === "SUCCESS") {
+        lockShieldWrap.className = "lock-shield-wrap unlocked";
+        lockShieldIcon.innerHTML = ICON_CHECK;
+        lockTitle.textContent = "Unlocked ✓";
+        lockSubtitle.textContent = "Starting SonicDrop…";
+        lockStatusChip.style.display = "inline-flex";
+        lockChipDot.style.background = "var(--success)";
+        lockStatusText.textContent = "Authentication verified";
+        btnBioAction.style.display = "none";
+      } else if (mode === "ERROR") {
+        lockShieldWrap.className = "lock-shield-wrap failed";
+        lockShieldIcon.innerHTML = ICON_ALERT;
+        lockTitle.textContent = "Authentication Failed";
+        lockSubtitle.textContent = opts.message || "Biometric verification did not succeed. Please try again.";
+        lockStatusChip.style.display = "inline-flex";
+        lockChipDot.style.background = "var(--danger)";
+        lockStatusText.textContent = opts.status || "Verification failed";
+        btnBioAction.style.display = "flex";
+        btnBioLabel.textContent = "Try Again";
+      } else if (mode === "UNSUPPORTED") {
+        lockShieldWrap.className = "lock-shield-wrap";
+        lockShieldIcon.innerHTML = ICON_ALERT;
+        lockTitle.textContent = "Biometric Unavailable";
+        lockSubtitle.textContent = "Biometric unlock isn't available on this device/browser.";
+        lockPrivacyNote.style.display = "none";
+        lockStatusChip.style.display = "inline-flex";
+        lockChipDot.style.background = "var(--warn)";
+        lockStatusText.textContent = opts.reason || "Context or hardware unsupported";
+        btnBioAction.style.display = "none";
+        btnBioFallback.style.display = "block";
+        btnBioFallback.textContent = "Continue to SonicDrop";
+      }
+    }
+
+    async function registerBiometric() {
+      appLockState = "UNLOCKING";
+      renderLockState("UNLOCKING", { subtitle: "Registering device passkey…" });
+
+      try {
+        const optRes = await fetch("/api/auth/register/options", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId })
+        });
+        if (!optRes.ok) throw new Error("Could not initialize registration options");
+        const optionsJSON = await optRes.json();
+
+        // Native WebAuthn Registration Prompt
+        const response = await window.SimpleWebAuthnBrowser.startRegistration({ optionsJSON });
+
+        const verifyRes = await fetch("/api/auth/register/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId, response })
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyRes.ok || !verifyData.verified) {
+          throw new Error(verifyData.error || "Server verification failed");
+        }
+
+        isDeviceRegistered = true;
+        unlockApp(verifyData.sessionToken);
+      } catch (err) {
+        appLockState = "LOCKED";
+        console.warn("[Auth] Registration error:", err);
+        if (err.name === "NotAllowedError" || err.message?.includes("aborted")) {
+          renderLockState("SETUP");
+          showError("Biometric setup was cancelled.");
+        } else {
+          renderLockState("ERROR", { message: err.message, status: "Setup failed" });
+        }
+      }
+    }
+
+    async function authenticateBiometric() {
+      appLockState = "UNLOCKING";
+      renderLockState("UNLOCKING");
+
+      try {
+        const optRes = await fetch("/api/auth/login/options", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId })
+        });
+        if (optRes.status === 404) {
+          isDeviceRegistered = false;
+          renderLockState("SETUP");
+          return;
+        }
+        if (!optRes.ok) throw new Error("Could not retrieve authentication options");
+        const optionsJSON = await optRes.json();
+
+        // Native WebAuthn Authentication Prompt
+        const response = await window.SimpleWebAuthnBrowser.startAuthentication({ optionsJSON });
+
+        const verifyRes = await fetch("/api/auth/login/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId, response })
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyRes.ok || !verifyData.verified) {
+          throw new Error(verifyData.error || "Biometric assertion failed");
+        }
+
+        unlockApp(verifyData.sessionToken);
+      } catch (err) {
+        appLockState = "LOCKED";
+        console.warn("[Auth] Authentication error:", err);
+        if (err.name === "NotAllowedError" || err.message?.includes("aborted")) {
+          renderLockState("LOCKED");
+          showError("Unlock prompt was cancelled.");
+        } else {
+          renderLockState("ERROR", { message: err.message, status: "Biometric mismatch or error" });
+        }
+      }
+    }
+
+    async function devBypass() {
+      try {
+        const res = await fetch("/api/auth/dev-bypass", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId })
+        });
+        const data = await res.json();
+        unlockApp(data.sessionToken);
+      } catch (err) {
+        showError("Failed to grant fallback session: " + err.message);
+      }
+    }
+
+    function unlockApp(sessionToken) {
+      currentSessionToken = sessionToken;
+      if (sessionToken) {
+        sessionStorage.setItem("sonicdrop_session_token", sessionToken);
+      }
+      appLockState = "UNLOCKED";
+      renderLockState("SUCCESS");
+      btnManualLock.style.display = "inline-flex";
+
+      setTimeout(() => {
+        showPhase("select");
+      }, 450);
+    }
+
+    function lockApp() {
+      if (!dataChannel || dataChannel.readyState !== "open") {
+        teardown();
+      }
+      if (currentSessionToken) {
+        fetch("/api/auth/lock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionToken: currentSessionToken })
+        }).catch(() => {});
+      }
+      currentSessionToken = null;
+      sessionStorage.removeItem("sonicdrop_session_token");
+      appLockState = "LOCKED";
+      btnManualLock.style.display = "none";
+      showPhase("lock");
+      renderLockState(isDeviceRegistered ? "LOCKED" : "SETUP");
+    }
+
+    async function initializeApp() {
+      platformAuthName = detectPlatformAuthName();
+      showPhase("lock");
+
+      const check = await isBiometricSupported();
+      biometricSupported = check.supported;
+
+      if (!biometricSupported) {
+        renderLockState("UNSUPPORTED", { reason: check.reason });
+        return;
+      }
+
+      try {
+        const stRes = await fetch(`/api/auth/status?deviceId=${encodeURIComponent(deviceId)}`);
+        const stData = await stRes.json();
+        isDeviceRegistered = Boolean(stData.registered);
+
+        if (!isDeviceRegistered) {
+          renderLockState("SETUP");
+        } else {
+          renderLockState("LOCKED");
+        }
+      } catch (err) {
+        console.warn("[Auth] Status fetch error:", err);
+        renderLockState(isDeviceRegistered ? "LOCKED" : "SETUP");
+      }
     }
 
     // ── Constants ────────────────────────────────────────────────────────────
@@ -741,6 +1149,11 @@
 
     // ── Acoustic Listen ──────────────────────────────────────────────────────
     async function startListening() {
+      if (appLockState !== "UNLOCKED") {
+        showError("Cannot start discovery: SonicDrop is locked.");
+        showPhase("lock");
+        return;
+      }
       const gw = await initGgwave();
       try {
         micStream = await navigator.mediaDevices.getUserMedia({
@@ -838,7 +1251,11 @@
     // ── Signaling + WebRTC ────────────────────────────────────────────────────
     function connectAndSend(roomId) {
       ws = createSignalingSocket();
-      ws.onopen = () => ws.send(JSON.stringify({ type: "join-room", roomId }));
+      ws.onopen = () => ws.send(JSON.stringify({
+        type: "join-room",
+        roomId,
+        sessionToken: currentSessionToken
+      }));
       ws.onmessage = async e => {
         const msg = JSON.parse(e.data);
         if      (msg.type === "room-joined") await startWebRTCSender(roomId);
@@ -849,7 +1266,12 @@
             teardown();
           }
         }
-        else if (msg.type === "error")       showError("Server: " + msg.message);
+        else if (msg.type === "error") {
+          showError("Server: " + msg.message);
+          if (msg.message && msg.message.toLowerCase().includes("locked")) {
+            lockApp();
+          }
+        }
       };
       ws.onerror = () => showError("WebSocket failed. Is the server running?");
     }
@@ -1107,7 +1529,34 @@
     }
 
     // ── Events ───────────────────────────────────────────────────────────────
+    btnBioAction.addEventListener("click", () => {
+      if (appLockState === "UNLOCKING") return;
+      if (!isDeviceRegistered) {
+        registerBiometric();
+      } else {
+        authenticateBiometric();
+      }
+    });
+
+    btnBioCancel.addEventListener("click", () => {
+      appLockState = "LOCKED";
+      renderLockState(isDeviceRegistered ? "LOCKED" : "SETUP");
+    });
+
+    btnBioFallback.addEventListener("click", () => {
+      devBypass();
+    });
+
+    btnManualLock.addEventListener("click", () => {
+      lockApp();
+    });
+
     btnSend.addEventListener("click", async () => {
+      if (appLockState !== "UNLOCKED") {
+        showPhase("lock");
+        renderLockState(isDeviceRegistered ? "LOCKED" : "SETUP");
+        return;
+      }
       if (currentMode === "file" && selectedFiles.length === 0) return;
       if (currentMode === "text" && textPayload.trim().length === 0) return;
       showPhase("listening");
@@ -1125,6 +1574,30 @@
       urlDetector.style.display = "none";
       showPhase("select");
     });
+
+    // ── Background / Tab Visibility Lifecycle ────────────────────────────────
+    let backgroundedAt = null;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        backgroundedAt = Date.now();
+        // If not actively transferring file chunks over WebRTC, release microphone in background
+        if (!dataChannel || dataChannel.readyState !== "open") {
+          stopMic();
+        }
+      } else if (document.visibilityState === "visible") {
+        // If backgrounded for more than 5 minutes, auto-lock for security unless actively transferring
+        if (backgroundedAt && (Date.now() - backgroundedAt > 5 * 60 * 1000)) {
+          if (!dataChannel || dataChannel.readyState !== "open") {
+            lockApp();
+          }
+        }
+        backgroundedAt = null;
+      }
+    });
+
+    // ── Startup Initialization ────────────────────────────────────────────────
+    window.addEventListener("DOMContentLoaded", initializeApp);
+    initializeApp();
 
     // ── Service Worker & Web Share Target Pickup ─────────────────────────────
     if ("serviceWorker" in navigator) {

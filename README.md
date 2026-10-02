@@ -1,184 +1,283 @@
 # 🔊 SonicDrop
 
-> **Zero-click, zero-pairing file transfer** via near-ultrasound acoustic handshaking (18.5–20 kHz) + WebRTC DataChannels.  
-> No QR codes. No pairing PINs. No cloud. Just bring your devices close together.
+> **Zero-click, zero-pairing file transfer** via near-ultrasound acoustic handshaking (18.5–20 kHz) + WebRTC DataChannels + **Native Biometric Application Lock (WebAuthn / Passkeys)**.  
+> No QR codes. No pairing PINs. No cloud. Direct peer-to-peer device transfers secured by your hardware biometric sensor.
 
 ---
 
-## How It Works
+## 🔐 Biometric Application Lock
+
+SonicDrop includes a **native biometric application lock** built using standard **WebAuthn / FIDO2 Passkeys**.
+
+```text
+┌─────────────────────────────┐
+│          SonicDrop          │
+│                             │
+│           🔐 LOCKED         │
+│                             │
+│     Unlock SonicDrop        │
+│                             │
+│   [ 👆 Unlock with          │
+│       Fingerprint ]         │
+│                             │
+└─────────────────────────────┘
+```
+
+The biometric lock directly protects the **mobile sender interface** (`sender.html`). While SonicDrop is locked:
+* 🚫 Microphone sampling is disabled.
+* 🚫 Near-ultrasound acoustic discovery cannot start.
+* 🚫 No WebRTC peer connections or data transfers are permitted.
+* 🚫 Joining signaling rooms without an authenticated session is rejected by the server.
+
+Once unlocked via **Fingerprint, Face ID, or Touch ID**, SonicDrop initiates acoustic listening and enables zero-click peer-to-peer transfers.
+
+---
+
+## 🛡️ Critical Privacy & Security Guarantee
+
+### Why SonicDrop Never Sees Your Biometrics
+
+> [!IMPORTANT]
+> **SonicDrop NEVER receives, accesses, transmits, or stores raw biometric data.**
+>
+> * ❌ No fingerprint images or scans
+> * ❌ No fingerprint feature templates or minutiae
+> * ❌ No face images or facial geometry
+> * ❌ No sensor data or raw biometric signals
+> * ❌ No private keys
+
+### How WebAuthn Works Under the Hood
+
+Authentication is delegated entirely to the device's operating system and secure hardware enclave (Android KeyStore, Apple Secure Enclave, or Windows TPM):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User (Fingerprint / Face ID)
+    participant HW as Hardware Enclave / OS
+    participant Browser as Mobile Browser (WebAuthn)
+    participant Server as SonicDrop Server
+    participant DB as Credential Store (JSON)
+
+    Note over User,HW: Authentication Phase
+    Server->>Browser: 1. Random Cryptographic Challenge + RP ID
+    Browser->>HW: 2. Invoke Platform Authenticator (navigator.credentials.get)
+    HW->>User: 3. Native Biometric Prompt (OS UI)
+    User->>HW: 4. Scans Fingerprint / Face
+    Note over HW: Biometric matched INSIDE Secure Enclave.<br/>Enclave unlocks private key.
+    HW->>Browser: 5. Cryptographic signature over challenge
+    Browser->>Server: 6. Signature Assertion (credentialId, signature, clientData)
+    Server->>DB: 7. Fetch public key & verify signature + counter
+    Server->>Browser: 8. Session Token granted (Unlocked)
+```
+
+**What the Server Actually Stores:**
+* Cryptographic Public Key (`credentialPublicKey`)
+* Ephemeral Credential ID (`credentialID`)
+* Monotonic Signature Counter (`counter` to prevent replay attacks)
+* Anonymous Device ID (`deviceId`)
+
+The private key never leaves the user's hardware.
+
+---
+
+## 🔄 Dual Architecture: Authentication & Acoustic Discovery
 
 ```
-Desktop (Receiver)                     Mobile (Sender)
-────────────────────                   ───────────────────
-1. Generate Room ID "839A"             1. User selects a file
-2. Emit inaudible ultrasound           2. Tap "Send File"
-   beacon encoding "839A"  ──────►     3. Mic samples audio
-   via speakers (18.5–20 kHz)          4. ggwave decodes "839A"
-3. Both join WebSocket room ◄──────►   5. Both join same room
-4. Exchange SDP Offer/Answer           6. Exchange ICE candidates
-5. RTCDataChannel established          7. RTCDataChannel established
-   ◄━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  8. Stream file in 64 KB chunks
-6. Reassemble → auto-download              with backpressure handling
+                         SonicDrop
+                             │
+                     ┌───────┴────────┐
+                     │                │
+                Authentication     Discovery
+                     │                │
+                 WebAuthn           ggwave
+                     │                │
+                     ▼                ▼
+               Biometric ✓       Room ID detected
+                     │                │
+                     └───────┬────────┘
+                             ▼
+                       WebRTC P2P
+                             │
+                             ▼
+                        File Transfer
 ```
 
 ---
 
-## Project Structure
+## 🚀 How It Works (Step-by-Step)
+
+```
+Desktop (Receiver)                         Mobile (Sender)
+──────────────────                         ───────────────
+                                           1. Open SonicDrop
+                                           2. 🔐 Native Biometric Prompt (WebAuthn)
+                                           3. Fingerprint / Face ID verified
+                                           4. Select file(s) or paste text
+                                           5. Tap "Send File(s)"
+1. Generate Room ID "839A"
+2. Emit inaudible ultrasound               6. Microphone samples acoustic beacon
+   beacon encoding "839A"  ────────►       7. ggwave decodes Room ID "839A"
+   via speakers (18.5–20 kHz)
+3. Both join WebSocket room ◄────────►    8. Sender joins room (with session token)
+4. Exchange SDP Offer/Answer               9. Exchange ICE candidates
+5. Direct RTCDataChannel established      10. Direct RTCDataChannel established
+   ◄━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━     11. Stream file in 64 KB chunks
+6. Reassemble → auto-download                 with backpressure control
+```
+
+---
+
+## 📂 Project Structure
 
 ```
 sonicdrop/
-├── server.js          ← Node.js WebSocket signaling server + static file host
+├── server.js                        ← Node.js HTTP server & WebSocket signaling relay
+├── authRoutes.js                    ← WebAuthn Level 2/3 endpoints (/api/auth/*)
+├── authStore.js                     ← Credential persistence (public keys & counters only)
+├── test-biometric.js                ← Automated end-to-end verification test suite
 ├── package.json
 ├── README.md
+├── data/                            ← Local file store for registered credentials (public only)
+│   └── credentials.json
 └── public/
-    ├── index.html     ← Receiver page (desktop)
-    ├── sender.html    ← Sender page (mobile)
-    └── utils.js       ← Shared ES module (Room ID gen, WebSocket, ICE config, helpers)
+    ├── index.html                   ← Receiver page (desktop sonar & tone emitter)
+    ├── sender.html                  ← Sender page (mobile biometric lock + ultrasonic receiver)
+    ├── simplewebauthn-browser.min.js← Local WebAuthn browser client bundle (offline ready)
+    ├── utils.js                     ← Shared ES module (STUN, WebRTC config, speed calculator)
+    ├── ggwave.js                    ← Audio FSK WebAssembly DSP
+    ├── manifest.json                ← PWA configuration with Web Share Target
+    ├── sw.js                        ← Service Worker (offline shell cache & share target)
+    └── icons/                       ← PWA app icons (192x192, 512x512, SVG)
 ```
 
 ---
 
-## Quick Start (Local / Desktop Testing)
+## 📱 User Experience & Flows
 
-> **Prerequisites:** Node.js ≥ 18
+### 1. First-Time Setup
+1. Open `https://<your-domain>/sender` on mobile.
+2. SonicDrop detects no passkey exists for this device.
+3. Lock screen shows: **"Set Up Biometric Unlock"**.
+4. User taps **"Enable Fingerprint"** (or Face ID / Touch ID).
+5. The device displays the native OS biometric prompt.
+6. User scans finger / face.
+7. Device registers public key with SonicDrop and unlocks.
 
-```bash
-# 1. Install dependencies
-npm install
+### 2. Returning User Flow
+1. Open `https://<your-domain>/sender`.
+2. Lock screen displays: **"SonicDrop is Locked"**.
+3. User taps **"Unlock with Fingerprint"**.
+4. Native biometric prompt verifies identity.
+5. SonicDrop unlocks into the file sender view.
 
-# 2. Start the server
-npm start
+### 3. Manual Lock
+* While unlocked, a **"Lock"** badge button is visible in the top header.
+* Tapping **"Lock"** immediately closes active audio sampling, clears the session, and locks the interface.
 
-# 3. Open in browser
-#    Receiver: http://localhost:8080
-#    Sender:   http://localhost:8080/sender
-```
-
-> ⚠️ **Both tabs on the same machine** works for desktop testing.  
-> For real mobile → desktop transfers, you need HTTPS (see below).
+### 4. Background & Lifecycle Behavior
+* If the user switches away from the browser, microphone listening is suspended immediately.
+* If backgrounded for more than 5 minutes, SonicDrop auto-locks to prevent unauthorized access.
+* Active WebRTC transfers in progress are preserved until completion.
 
 ---
 
-## HTTPS Setup for Mobile (Required for Mic Access)
+## 🌐 HTTPS Requirement
 
-Mobile browsers (`getUserMedia`) require a **secure context** — either `localhost` or HTTPS.
+Both **WebAuthn** and **Microphone Access** (`getUserMedia`) require a **Secure Context** (`https://` or `http://localhost`).
 
-### Option A: ngrok (Easiest — No Install Needed)
+### Local Development / Testing
+* Testing on the same machine works at `http://localhost:8080`.
+* For mobile phone testing, use one of the tunnels below.
 
+### Exposing via ngrok (Recommended for Phones)
 ```bash
-# Terminal 1: start SonicDrop
+# Terminal 1: Run SonicDrop
 npm start
 
-# Terminal 2: expose via ngrok (free account)
+# Terminal 2: Expose HTTPS tunnel
 npx ngrok http 8080
 ```
+Open the generated `https://xxxx.ngrok-free.app/sender` on your smartphone.
 
-Copy the `https://xxxx.ngrok.io` URL, open it on both desktop and mobile.
-
-### Option B: Cloudflare Tunnel (Free, No Account Needed)
-
+### Exposing via Cloudflare Tunnel
 ```bash
-# Windows (PowerShell)
-winget install cloudflare.cloudflared
-
-# Start tunnel
 cloudflared tunnel --url http://localhost:8080
 ```
 
-### Option C: mkcert (Local Trusted HTTPS)
+---
 
-```bash
-# Install mkcert
-winget install FiloSottile.mkcert
+## 💻 How to Run (Windows Commands)
 
-# Create local CA + certificate
-mkcert -install
-mkcert localhost 127.0.0.1 ::1 YOUR_LOCAL_IP
-
-# Then update server.js to use https module with the cert files:
-# (see server.js comments at the bottom)
+### 1. Install Dependencies
+```powershell
+npm install
 ```
 
-### Option D: Local IP + Android/Chrome Flag
+### 2. Run Automated Test Suite
+```powershell
+node test-biometric.js
+```
+Runs 36 comprehensive checks covering:
+* WebAuthn options generation
+* Cryptographic challenge validation
+* Replay attack prevention (single-use challenges)
+* Invalid payload rejection
+* Ephemeral session creation, validation, and manual lock
+* WebSocket room joining with session enforcement
+* WebRTC SDP offer/answer and ICE candidate relay
+* Static file and PWA caching
 
-On Chrome for Android, navigate to `chrome://flags/#unsafely-treat-insecure-origin-as-secure`, add your local IP (e.g., `http://192.168.1.100:8080`), and enable it.
-
----
-
-## Architecture Details
-
-### Signaling Server (`server.js`)
-
-| Feature | Implementation |
-|---|---|
-| Transport | Native Node.js `ws` WebSocket library |
-| Room state | In-memory `Map<roomId, { peers: Set<WebSocket>, timer }>` |
-| Max peers/room | 2 |
-| Inactivity TTL | 5 minutes (auto-prune) |
-| Message types | `create-room`, `join-room`, `signal`, `peer-joined`, `peer-left`, `error` |
-| Static serving | Built-in HTTP server with MIME mapping + clean URLs |
-
-### Audio DSP (`ggwave` v0.4.2)
-
-| Setting | Value |
-|---|---|
-| Protocol | `GGWAVE_PROTOCOL_ULTRASOUND_FASTEST` (id=9) |
-| Frequency range | ~18.5 kHz – 20 kHz |
-| Sample rate | 48,000 Hz |
-| Output gain cap | 0.5 (prevents speaker distortion on budget hardware) |
-| Mic constraints | `echoCancellation: false, noiseSuppression: false, autoGainControl: false` |
-| Decode buffer | 2048 samples (ScriptProcessorNode) |
-| Beacon interval | Every 2 seconds |
-| Decode timeout | 5 seconds → manual Room ID fallback |
-
-### WebRTC Data Transfer
-
-| Setting | Value |
-|---|---|
-| ICE servers | Google STUN ×3 |
-| DataChannel | `ordered: true` (TCP-like reliability) |
-| Chunk size | 64 KB |
-| Backpressure high-water | 16 MB → pause |
-| Backpressure low-water | 2 MB → resume |
-| Metadata message | JSON: `{ name, size, mimeType }` (first message) |
-| Data messages | Binary `ArrayBuffer` |
+### 3. Start the Server
+```powershell
+npm start
+```
+* **Receiver (Desktop):** `http://localhost:8080/`
+* **Sender (Mobile):** `http://localhost:8080/sender`
 
 ---
 
-## Browser Compatibility
+## 🧪 Device-Specific Testing Instructions
 
-| Feature | Chrome | Firefox | Safari | Edge |
-|---|---|---|---|---|
-| WebRTC DataChannel | ✅ | ✅ | ✅ 15.4+ | ✅ |
-| AudioContext 48kHz | ✅ | ✅ | ✅ | ✅ |
-| ScriptProcessorNode | ✅ | ✅ | ✅ | ✅ |
-| getUserMedia (HTTPS) | ✅ | ✅ | ✅ | ✅ |
-| WebAssembly (ggwave) | ✅ | ✅ | ✅ | ✅ |
+### Testing on Android (Chrome)
+1. Expose server via HTTPS (`npx ngrok http 8080`).
+2. Open Chrome on Android and navigate to `https://<ngrok-url>/sender`.
+3. Tap **"Enable Fingerprint"**.
+4. Android's native biometric bottom-sheet appears ("Verify it's you").
+5. Scan your fingerprint $\rightarrow$ App unlocks instantly.
+6. Tap the **"Lock"** button in the header $\rightarrow$ App locks.
+7. Tap **"Unlock with Fingerprint"** $\rightarrow$ Scan fingerprint $\rightarrow$ Unlocks.
+8. Test failure: Scan an unregistered finger $\rightarrow$ Native Android shows "Fingerprint not recognized", app remains locked.
 
-> 💡 **ScriptProcessorNode** is deprecated but has universal support. Upgrade path: replace with `AudioWorkletNode` for true zero-copy audio processing in a dedicated thread.
+### Testing on iPhone (Safari)
+1. Expose server via HTTPS (`npx ngrok http 8080`).
+2. Open Safari on iOS and navigate to `https://<ngrok-url>/sender`.
+3. Tap **"Enable Face ID / Touch ID"**.
+4. iOS shows native passkey prompt ("Sign in with Passkey").
+5. Glance at TrueDepth camera (Face ID) or scan Touch ID $\rightarrow$ App unlocks.
+6. Tap **"Lock"** $\rightarrow$ Locks. Tap **"Unlock with Face ID"** $\rightarrow$ Re-authenticates.
 
----
-
-## Security Notes
-
-- **No data touches any server** — all file bytes travel directly peer-to-peer via WebRTC DataChannel encrypted with DTLS.
-- The signaling server only relays SDP/ICE messages (no file data ever).
-- Room IDs are ephemeral and cryptographically random (32-symbol alphabet, 4 chars = ~1M combinations).
-- The ultrasound beacon stops immediately once the WebRTC connection is established.
-
----
-
-## Roadmap / Future Improvements
-
-- [ ] Replace `ScriptProcessorNode` with `AudioWorkletProcessor` for off-main-thread decoding
-- [ ] Add TURN server support for cross-NAT/firewall transfers
-- [ ] Multi-file / directory zip streaming
-- [ ] End-to-end encryption layer (ECDH key exchange + AES-GCM) on top of DTLS
-- [ ] PWA manifest + Service Worker for installable mobile app
-- [ ] WebCodecs API for hardware-accelerated audio encoding
+### Testing on Desktop (Windows Hello / Mac Touch ID)
+* In Chrome/Edge on Windows 11: Prompt triggers **Windows Hello** (Fingerprint, PIN, or facial recognition).
+* In Safari/Chrome on macOS: Prompt triggers **Mac Touch ID**.
+* In browsers without platform biometric hardware: An informative card is displayed explaining that biometric hardware is unavailable, with a **"Continue to SonicDrop"** fallback.
 
 ---
 
-## License
+## ⚡ Architecture Specifications
 
-MIT — build something cool 🚀
+| Component | Technology | Security / Detail |
+|---|---|---|
+| **Biometric Auth** | W3C WebAuthn / Passkeys Level 2 & 3 | `@simplewebauthn/server` v14 + `@simplewebauthn/browser` |
+| **User Verification** | `userVerification: "required"` | Enforces biometric verification at the authenticator |
+| **Credential Storage** | File-backed JSON (`data/credentials.json`) | Public keys, counter, credential IDs only (zero biometrics) |
+| **Replay Prevention** | Single-use challenges + Monotonic Counters | Challenges deleted upon first verification; counters validated |
+| **Signaling** | Native Node.js `ws` WebSocket | Ephemeral 4-character rooms with 5-minute TTL |
+| **Acoustic Discovery** | `ggwave` WASM (18.5–20 kHz) | Inaudible near-ultrasound beaconing |
+| **File Transfer** | WebRTC DataChannels | Direct P2P encrypted with DTLS |
+| **Flow Control** | 64 KB binary chunks | Backpressure thresholds (16 MB high-water, 2 MB low-water) |
+
+---
+
+## 📄 License
+MIT

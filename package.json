@@ -8,11 +8,19 @@
     "dev": "node server.js"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.0.3",
     "ws": "^8.18.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": ["webrtc", "ggwave", "ultrasound", "file-transfer", "p2p"],
+  "keywords": [
+    "webrtc",
+    "ggwave",
+    "ultrasound",
+    "file-transfer",
+    "p2p"
+  ],
   "license": "MIT"
 }

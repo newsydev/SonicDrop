@@ -21,6 +21,7 @@ const http = require("http");
 const fs   = require("fs");
 const path = require("path");
 const { WebSocketServer } = require("ws");
+const { handleAuthRequest, isValidSession } = require("./authRoutes");
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 const PORT          = process.env.PORT || 8080;
@@ -62,8 +63,19 @@ function serveFile(fp, res) {
   fs.createReadStream(fp).pipe(res);
 }
 
-// ─── HTTP Server (static file serving) ───────────────────────────────────────
-const httpServer = http.createServer((req, res) => {
+// ─── HTTP Server (static file serving + WebAuthn API) ────────────────────────
+const httpServer = http.createServer(async (req, res) => {
+  // Handle WebAuthn authentication endpoints
+  try {
+    const handled = await handleAuthRequest(req, res, PORT);
+    if (handled) return;
+  } catch (err) {
+    console.error("[HTTP] Error in handleAuthRequest:", err);
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Internal Server Error" }));
+    return;
+  }
+
   let urlPath = req.url.split("?")[0];
 
   // Fallback for Web Share Target POST if service worker not yet activated
@@ -178,6 +190,12 @@ function handleJoinRoom(ws, msg) {
     return;
   }
 
+  // If a sessionToken is passed by sender, verify that it represents an active unlocked session
+  if (msg.sessionToken && !isValidSession(msg.sessionToken)) {
+    send(ws, { type: "error", message: "Application is locked. Biometric authentication required." });
+    return;
+  }
+
   const room = rooms.get(roomId);
 
   if (room.peers.size >= MAX_ROOM_PEERS) {
@@ -282,8 +300,9 @@ httpServer.listen(PORT, () => {
 ║  Receiver (Desktop):  http://localhost:${PORT}/         ║
 ║  Sender   (Mobile):   http://localhost:${PORT}/sender   ║
 ║                                                      ║
-║  ⚠  Mobile requires HTTPS for microphone access.    ║
-║     Use a tunnel (ngrok/cloudflared) or mkcert.     ║
+║  🔐  Biometric Lock: WebAuthn / Passkeys Active      ║
+║  ⚠   Mobile requires HTTPS for Mic & Biometrics      ║
+║      Use a tunnel (ngrok/cloudflared) or mkcert.     ║
 ╚══════════════════════════════════════════════════════╝
   `);
 });

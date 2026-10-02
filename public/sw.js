@@ -3,7 +3,7 @@
  * Handles offline caching and native OS Web Share Target (POST /share-target)
  */
 
-const CACHE_NAME = "sonicdrop-v1";
+const CACHE_NAME = "sonicdrop-v2";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -11,6 +11,7 @@ const STATIC_ASSETS = [
   "/sender.html",
   "/utils.js",
   "/ggwave.js",
+  "/simplewebauthn-browser.min.js",
   "/manifest.json",
   "/icons/icon.svg",
   "/icons/icon-192.png",
@@ -97,8 +98,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Skip WebSocket connections
-  if (url.pathname.startsWith("/ws")) return;
+  // Skip WebSocket connections and dynamic authentication API requests
+  if (url.pathname.startsWith("/ws") || url.pathname.startsWith("/api/")) return;
 
   // 2. Cache-first with Network Fallback for GET requests
   if (event.request.method === "GET") {
